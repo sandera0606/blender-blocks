@@ -1,0 +1,61 @@
+"""
+SnapBlock constants — the single home for all magic numbers and presets.
+
+Nothing else in the add-on should hardcode grid sizes, names, or colors; import
+from here so there's one place to change them.
+"""
+
+# --- Grid ------------------------------------------------------------------
+# One grid cell = 2.0 Blender units (the blocks' native modeling scale). See
+# SNAPBLOCK_BRIEF.md "Grid system". Placements are stored as integer grid coords
+# (gx, gy, gz) and converted to world coords as (gx*U, gy*U, gz*H).
+U = 2.0   # cell size on X and Y, in Blender units
+H = 2.0   # block body height on Z (one cell). Studs add ~0.5 on top.
+
+# --- Names / UI ------------------------------------------------------------
+ADDON_CATEGORY = "SnapBlock"            # the N-panel tab name
+BUILD_COLLECTION = "SnapBlock Build"    # collection placed blocks go into
+LIBRARY_FILENAME = "snapblock_library.blend"   # bundled block library
+
+# --- Block catalogue -------------------------------------------------------
+# (type_id, display_label). type_id must match an object name in the library
+# .blend; placed blocks are named "Block_<type_id>.NNN". Ordered small -> large.
+# Footprint sizes (in cells) are deliberately omitted until the rotation/
+# orientation question is settled — see tools/check_rotation.py.
+BLOCK_TYPES = (
+    ("1x1",        "1×1"),
+    ("1x1_round",  "1×1 round"),
+    ("2x1",        "2×1"),
+    ("2x2",        "2×2"),
+    ("2x2_round",  "2×2 round"),
+    ("3x1",        "3×1"),
+    ("3x2",        "3×2"),
+    ("4x1",        "4×1"),
+    ("4x2",        "4×2"),
+    ("4x2_smooth", "4×2 smooth"),
+    ("6x1",        "6×1"),
+    ("8x2",        "8×2"),
+    ("step",       "Step"),
+    ("L",          "L-block"),
+    ("T",          "T-block"),
+    ("10x2",       "10×2"),
+    ("10x4",       "10×4"),
+    ("10x8",       "10×8"),
+    ("10x10",      "10×10"),
+    ("20x10",      "20×10"),
+    ("20x20",      "20×20"),
+)
+
+# --- Color presets ---------------------------------------------------------
+# (name, (r, g, b, a)). Applied later as Principled BSDF base color on a
+# material named "SnapBlock_<name>". Values are friendly sRGB-ish picks.
+COLOR_PRESETS = (
+    ("White",  (0.90, 0.90, 0.90, 1.0)),
+    ("Black",  (0.02, 0.02, 0.02, 1.0)),
+    ("Red",    (0.70, 0.05, 0.05, 1.0)),
+    ("Orange", (0.85, 0.35, 0.03, 1.0)),
+    ("Yellow", (0.85, 0.65, 0.05, 1.0)),
+    ("Green",  (0.10, 0.50, 0.12, 1.0)),
+    ("Blue",   (0.05, 0.15, 0.60, 1.0)),
+    ("Gray",   (0.30, 0.30, 0.30, 1.0)),
+)
