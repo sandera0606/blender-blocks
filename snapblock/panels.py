@@ -35,6 +35,21 @@ class SNAPBLOCK_PT_main(bpy.types.Panel):
         # The reveal toggle is the headline feature — keep it at the very top.
         layout.prop(scene, "snapblock_reveal",
                     text="Show me what's really happening", toggle=True)
+
+        # When reveal is on, the explanation of the last action sits directly under
+        # the toggle so the two read as one feature. (This is the calm replacement
+        # for the old viewport flash; reveal.note() sets the text, get_note() reads
+        # it.) layout.label doesn't wrap, so we wrap and emit one label per line.
+        if scene.snapblock_reveal:
+            box = layout.box()
+            box.label(text="What just happened", icon='INFO')
+            note = reveal.get_note()
+            if note:
+                for line in textwrap.wrap(note, width=34):
+                    box.label(text=line)
+            else:
+                box.label(text="Do something and I'll explain it here.")
+
         layout.label(text="Pick a block below to start building.")
 
 
@@ -110,36 +125,6 @@ class SNAPBLOCK_PT_move(bpy.types.Panel):
                 op.dx, op.dy, op.dz = dx, dy, dz
 
 
-class SNAPBLOCK_PT_lastaction(bpy.types.Panel):
-    """A calm, stay-put explanation of the last action — the replacement for the
-    old viewport flash. Only appears when reveal mode is on (poll() controls that),
-    and updates each time an operator records a note via reveal.note()."""
-    bl_label = "What just happened"
-    bl_idname = "SNAPBLOCK_PT_lastaction"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_parent_id = "SNAPBLOCK_PT_main"
-
-    @classmethod
-    def poll(cls, context):
-        return context.scene.snapblock_reveal
-
-    def draw(self, context):
-        layout = self.layout
-        note = reveal.get_note()
-        if not note:
-            # Before the first action there's nothing to explain yet.
-            layout.label(text="Do something and I'll explain it here.")
-            return
-        # bpy note: layout.label doesn't wrap, so wrap the text ourselves and
-        # emit one label per line (same approach as the glossary).
-        box = layout.box()
-        first = True
-        for line in textwrap.wrap(note, width=34):
-            box.label(text=line, icon='INFO' if first else 'BLANK1')
-            first = False
-
-
 class SNAPBLOCK_PT_glossary(bpy.types.Panel):
     """Plain-English definitions of the Blender words SnapBlock uses. Only appears
     when reveal mode is on — that's what poll() controls."""
@@ -172,6 +157,5 @@ classes = (
     SNAPBLOCK_PT_blocks,
     SNAPBLOCK_PT_colors,
     SNAPBLOCK_PT_move,
-    SNAPBLOCK_PT_lastaction,
     SNAPBLOCK_PT_glossary,
 )

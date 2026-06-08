@@ -1,87 +1,81 @@
 # SnapBlock
 
-A Blender 4.2+ add-on that gives adult beginners a snap-block toy to play with
-inside a real Blender scene. You drop pre-made blocks onto a grid, snap them
-together, and color them. Behind the scenes you're left with normal Blender
-objects, materials, and collections.
+SnapBlock is a Blender add-on that lets beginners build things out of snap-together blocks. You
+pick a block from the sidebar, it drops onto a grid, and you snap more next to it and color them
+in. Every block you place is just a regular Blender object, with a regular material, in a regular
+collection. Nothing is faked or hidden behind the scenes.
 
-The point isn't to build a separate app inside Blender. It's trainer wheels for
-Blender itself. Every action leaves behind a real, editable scene, and a
-"show me what's really happening" mode explains the Blender concept behind each
-click as you go. Uninstall the add-on and your scene still works.
+That's the whole idea. Get someone making something in Blender in a couple of minutes without
+making them learn the interface first, but have everything they make be real Blender data they
+can keep using later. Turn the add-on off and the scene still works.
 
-## Who it's for
+## Reveal mode
 
-People who've heard Blender is powerful, opened it once, and bounced off the
-learning curve. The goal is making something fun in about 90 seconds, not
-sitting through a four-hour donut tutorial before placing your first cube.
+There's a toggle: "Show me what's really happening." Turn it on and the add-on starts narrating
+itself. Hover a button and the tooltip tells you which Blender operation it runs. A glossary
+panel explains the words beginners keep hitting (Object, Mesh, Material, Collection, and so on).
+After each action, a panel shows what just happened. The point is that someone ends up actually
+knowing what an Object or a Collection is, not just that a button worked.
 
-## How it works
+## What works right now
 
-- Blocks live on a grid where one cell is 2.0 Blender units. Positions are stored
-  as integer grid coordinates and only converted to world space when a block is
-  placed, so things always line up.
-- You pick a block from the side panel and it appears at the 3D cursor, snapped
-  to the grid and ready to nudge.
-- Colors are preset swatches. Each one maps to a plain Principled BSDF material
-  named `SnapBlock_<color>`, nothing exotic.
-- Placed blocks are named `Block_<type>.<counter>` and grouped in a collection
-  called `SnapBlock Build`, because the Outliner is part of learning Blender, not
-  something to hide.
+- Placing blocks. Pick one from the sidebar, it lands on the grid, snapped and selected.
+- Coloring. Click a swatch, it applies a material (`SnapBlock_Red`, and so on) and reuses it
+  across blocks of the same color.
+- Moving. Buttons or arrow keys shift a block one whole grid cell at a time so things stay lined
+  up.
+- Reveal mode, above.
 
-A note on naming: these are "blocks" or "snap blocks," never "LEGO" or "bricks."
-That's a trademark thing, not a style preference.
+It all runs in Blender. Before I call v0.1 done I still need to rebuild the block library at the
+new grid scale and time the "build a small house in 90 seconds" test.
 
-## Installing and using the add-on
+## Notes on the code
 
-Heads up: v0.1 isn't packaged yet, so there's no zip to download today (see
-Project status below). When it ships, it installs the normal Blender way:
+A few things I'd point at:
 
-1. Get `snapblock.zip` (a release download, or zip up the `snapblock/` folder
-   yourself). Keep it zipped — don't unzip it first.
-2. In Blender: Edit > Preferences > Add-ons > Install from Disk, then pick the zip.
-3. Tick the checkbox next to "SnapBlock" to enable it.
-4. In the 3D viewport, press `N` to open the side panel and click the **SnapBlock**
-   tab.
+- Everything is real Blender data. No custom data blocks, no hidden state. The scene survives
+  without the add-on, which is the entire point.
+- Positions are integers. A block's position is stored as a whole grid cell and only turned into
+  world coordinates when it's placed. Origins sit at the block's corner, not its center.
+  Otherwise odd-width and even-width blocks land on slightly different grids and stop lining up.
+- One operator per action. Add, color, and nudge are separate operators instead of one big one
+  that branches.
+- No tracebacks reach the user. A missing file or an empty selection gives a plain message.
+- bpy shifts between versions. One material input got renamed in Blender 4.x, so the code checks
+  for it instead of assuming it's there.
 
-Then, to actually build something:
+Written in Python against Blender's API (`bpy`), for Blender 4.2+.
 
-1. Click a block in the panel. It drops in at the 3D cursor, snapped to the grid.
-   Press `G` to slide it around (snapping stays on) or `R` to rotate.
-2. Select one or more blocks and click a color swatch to paint them.
-3. Flip on **"Show me what's really happening"** to see the real Blender action
-   behind each click, plus a plain-English glossary.
+## The dev bridge
 
-Everything you make is ordinary Blender data. Look in the Outliner (top right) and
-you'll see your blocks as real objects in a collection called `SnapBlock Build`.
+`bpy` only exists inside Blender, so testing add-on code usually means pasting a script into
+Blender's scripting tab, running it, and copying the output back. I got tired of that and wrote
+a bridge.
 
-## Project status
+It's a socket server running inside Blender. Send it Python, get the result back. The catch is
+`bpy` isn't thread-safe, so it can't run on the socket thread. Requests go on a queue and run on
+Blender's main thread through a timer, then the result gets passed back. It's also wired up as an
+MCP server so an AI assistant can drive it while I work. Dev tool only, not shipped. See
+`dev/README.md`.
 
-Early. The repo currently holds the design and source assets, not a finished
-add-on. Here's what's here:
+## Status and what's next
 
-- `SNAPBLOCK_BRIEF.md` — the full design brief and the source of truth for scope
-  and rationale. Start here if you want the details.
-- `CLAUDE.md` — working rules for anyone (including Claude Code) touching the repo.
-- `source_blocks/all_blocks.blend` — the master library of ~22 hand-modeled
-  blocks. This file is read-only and never edited in place.
-- `legacy__init__.py` — a partial earlier attempt. Useful scaffolding, not a
-  working add-on.
-- `dev/` — developer tooling (see below). Not shipped with the add-on.
+Placing, coloring, moving, and reveal mode are all written and running. Left for v0.1:
 
-The `snapblock/` add-on folder described in the brief doesn't exist yet.
+- Rebuild the block library at the current scale (one grid cell = one Blender unit).
+- Run the 90-second house test end to end.
+- Check block orientation and the reveal panels.
 
-## dev/ — Blender bridge for development
+Not packaged for download yet, so there's no install step for now.
 
-Working on a Blender add-on means running `bpy`, which only exists inside Blender.
-The `dev/` folder has a small bridge that lets Claude Code run code in a live
-Blender session over a localhost socket, instead of pasting scripts into the
-Scripting tab by hand. It's a development convenience and has nothing to do with
-the shipped add-on. Setup and details are in `dev/README.md`.
+Things left out of the first version on purpose:
 
-## Building it
+- Importing your own blocks
+- Textures
+- Animation
+- Export to other block formats
 
-The build order, the v0.1 milestone, and what's deliberately left out are all in
-`SNAPBLOCK_BRIEF.md`. The short version of "done" for v0.1: a new user can build
-a tiny house in about 90 seconds, end up with real Blender objects, and color
-them along the way.
+## Naming
+
+They're "blocks" or "snap blocks," not "LEGO" or "bricks." It's a trademark thing. The shapes
+are custom anyway, not real LEGO proportions.
