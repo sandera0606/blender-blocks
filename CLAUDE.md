@@ -8,13 +8,10 @@ SnapBlock is a **Blender 4.2+ add-on** that gives beginners a snap-block toy on 
 
 ## Repo state
 
-Greenfield. Currently contains:
-
-- `SNAPBLOCK_BRIEF.md` — full design brief.
-- `legacy__init__.py` — partial earlier attempt under the name "LEGO Toolkit." ~30% reusable as scaffolding (`register()`/`unregister()` pattern, main-panel + subpanel via `bl_parent_id`, the `row.template_ID(...)` material idiom). Rename everything from LEGO to SnapBlock; drop `mat.use_nodes = False` and `blend_method = 'BLEND'`; the `scene.my_tool` reference is dead.
-- `source_blocks/all_blocks.blend` — the user's master library, ~22 blocks in a collection named `"blocks"`.
-
-The `snapblock/` add-on folder does not exist yet. Target layout is in the brief.
+- `SNAPBLOCK_BRIEF.md` — full design brief (source of truth).
+- `snapblock/` — the add-on package (`constants.py`, `library.py`, `operators.py`, `panels.py`, `reveal.py`, `snapblock_library.blend`).
+- `source_blocks/all_blocks.blend` — the user's master library, ~22 blocks in a collection named `"blocks"` (read-only).
+- `tools/` — dev-time build/audit utilities. `dev/` — the MCP bridge (see Hard rule 5); not shipped.
 
 ## Hard rules
 
@@ -22,7 +19,7 @@ The `snapblock/` add-on folder does not exist yet. Target layout is in the brief
 2. **Never auto-fix discrepancies in the user's blocks.** Inconsistent origins, unapplied scales, non-grid dimensions → report and wait for input. The user wants visibility, not silent fixes.
 3. **Stay inside v0.1 scope.** The brief's "Out of scope for v0.1" list is binding. Confirm with the user before doing anything outside it.
 4. **Never call the blocks "LEGO" or "bricks."** "Blocks" or "snap blocks." Legal/trademark, not stylistic.
-5. **You cannot run `bpy` yourself.** It only exists inside Blender. The user runs scripts in Blender's Scripting tab and pastes back results. Make scripts that print clear, copy-pastable output.
+5. **Run `bpy` via the dev bridge when it's up.** The `snapblock-blender` MCP tools (`run_python`, `get_scene_summary`, `dump_library_state`, `reload_addon`, …) execute in the live Blender session. If the bridge isn't running, fall back to copy-paste scripts that print clear, copy-pastable output. Setup and tool list: `dev/README.md`.
 
 ## Design rules (from the brief)
 
@@ -49,8 +46,8 @@ The user is **strong at Python, new to bpy**. So:
 
 - Before writing a new module, state what it will contain and get buy-in.
 - Before non-trivial changes to existing code, summarize the planned change first.
-- To verify something about a `.blend` file, write a diagnostic script for the user to run — don't guess.
-- After changes, give exact testing steps in Blender (save, install zip, enable, where to click).
+- To verify something about a `.blend` file, inspect it live (`dump_library_state`, `run_python`) rather than guessing; only write a paste-in script if the bridge is down.
+- After editing the add-on, `reload_addon` and exercise the operator via `run_python` — no zip rebuild for dev iteration. Give zip/install steps only when the user is doing a real install.
 
 ## Build order
 

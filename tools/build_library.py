@@ -15,11 +15,15 @@ What it does to each block (on the appended copy, in memory):
      no bpy.ops needed.
   2. Drops the empty material slots (colors are applied at runtime).
   3. Renames to a clean, friendly type ID (see NAME_MAP).
-  4. Leaves geometry at native scale — one grid cell = 2.0 Blender units.
+  4. Scales geometry by 0.5 so one grid cell = 1.0 Blender unit. The blocks are
+     authored at 2.0 BU/cell, but Blender's native grid and increment-snap step
+     by 1.0, so halving makes one cell line up with one native unit — a placed
+     block at cell (3,0) then sits at world (3,0), and snap-dragging lands on
+     whole cells. (Must match U=H=1.0 in snapblock/constants.py.)
 
 HOW TO RUN
   1. Open Blender 4.2+ and do File > New (a throwaway scene).
-  2. Scripting tab > paste this whole file > check the PATHS below > Run.
+  2. Scripting tab > Text > Open > pick this file (so __file__ resolves) > Run.
   3. Read the printed report. Confirm snapblock/snapblock_library.blend was written.
   4. Close Blender WITHOUT saving.
 """
@@ -28,13 +32,24 @@ import bpy
 import os
 
 # ---------------------------------------------------------------------------
-# Paths. Defaults assume the repo layout; edit if Blender can't find them.
+# Paths. The repo root is derived from this script's own location, so it works
+# wherever the repo is cloned — provided you ran the file via Text > Open (which
+# sets __file__). If you pasted the script into a fresh text block instead,
+# __file__ won't exist; set REPO to your repo root by hand below.
 # ---------------------------------------------------------------------------
-REPO = r"C:\Users\shuan\Documents\personal\Coding\snapblock"
+try:
+    REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+except NameError:
+    REPO = ""   # e.g. r"D:\code\snapblock" — only needed if you pasted the script
 SOURCE_PATH = os.path.join(REPO, "source_blocks", "all_blocks.blend")
 OUTPUT_PATH = os.path.join(REPO, "snapblock", "snapblock_library.blend")
 
 COLLECTION_NAME = "blocks"
+
+# Geometry scale factor. Blocks are authored at 2.0 BU/cell; we halve them so one
+# cell = 1.0 BU, matching Blender's native grid + U=H=1.0 in the add-on. Keep this
+# the reciprocal of (authored cell size / target cell size) = 1.0 / 2.0.
+SCALE = 0.5
 
 # Source object name -> clean type ID. Placed blocks become Block_<type>.NNN.
 # Friendly/descriptive style, per the user's choice. Anything not listed keeps
@@ -143,7 +158,7 @@ def main():
         src_name = obj.name
         mesh = obj.data
 
-        # --- 1. re-origin to the bottom -X/-Y corner by shifting the geometry ---
+        # --- 1. scale to 1.0 BU/cell, then re-origin to bottom -X/-Y corner ---
         if mesh.name in seen_meshes:
             # Shared mesh would get shifted twice. None of these blocks share a
             # mesh, but if that ever changes we want a loud warning, not silent
@@ -151,6 +166,27 @@ def main():
             rows.append((src_name, "!! SHARED MESH — skipped re-origin", ""))
             continue
         seen_meshes.add(mesh.name)
+
+        # --- 0. zero any unapplied object rotation ---
+        # The audit only checked scale; 7 source blocks carry a leftover object-
+        # level rotation (10X4/10X8/20X10/T at 180°, 20X20 at 360°, L at 90°,
+        # 1x1c at 11°). rotation_euler is an OBJECT transform, separate from the
+        # mesh geometry. The placement operator positions a library block purely
+        # by its location and assumes identity orientation, so every library block
+        # must sit at zero rotation. Every one of these is a pure-Z rotation, so
+        # dropping it never flips a block upside-down — studs stay up. We discard
+        # the rotation rather than baking it into the verts: for the symmetric
+        # plates it's visually identical, and orientation of a template block is
+        # arbitrary anyway (the user rotates with R in the scene).
+        had_rot = tuple(round(a, 4) for a in obj.rotation_euler) != (0.0, 0.0, 0.0)
+        obj.rotation_euler = (0.0, 0.0, 0.0)
+
+        # Scale every vertex about the local origin first. Scaling and the corner
+        # shift commute (both are linear in the verts), so we scale, then read the
+        # now-halved footprint and shift its corner to 0 — order doesn't change the
+        # result, but doing scale first keeps the re-origin math obvious.
+        for v in mesh.vertices:
+            v.co *= SCALE
 
         min_x, min_y, min_z = footprint_corner(mesh)
         for v in mesh.vertices:
@@ -182,8 +218,8 @@ def main():
         vmin_x, vmin_y, vmin_z = footprint_corner(mesh)
         rows.append((
             src_name, obj.name,
-            "origin->({:+.3f},{:+.3f},{:+.3f})  slots removed: {}{}".format(
-                vmin_x, vmin_y, vmin_z, n_slots, collided),
+            "origin->({:+.3f},{:+.3f},{:+.3f})  slots removed: {}  rot->0: {}{}".format(
+                vmin_x, vmin_y, vmin_z, n_slots, "yes" if had_rot else "-", collided),
         ))
 
     # --- 4. write the cleaned blocks to the addon's library .blend ---
@@ -204,8 +240,9 @@ def main():
     print("Library build report:")
     print("  ✓ {} blocks written".format(len(datablocks)))
     print("  ✓ All re-origined to the bottom -X/-Y corner (origin reads ~0,0,0 above)")
+    print("  ✓ All object rotations zeroed (7 blocks had leftover Z rotation)")
     print("  ✓ Empty material slots removed")
-    print("  ✓ Native scale kept (one cell = 2.0 BU)")
+    print("  ✓ Scaled by {} — one cell = {:.1f} BU".format(SCALE, 2.0 * SCALE))
     print("  ✓ Written to {}".format(OUTPUT_PATH))
     for new, note in VERIFY_NOTES.items():
         print("  ⚠ Please eyeball '{}': {}".format(new, note))

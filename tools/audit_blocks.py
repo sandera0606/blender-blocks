@@ -9,7 +9,7 @@ it only tells you what's there so we can decide the origin convention together.
 
 HOW TO RUN
   1. Open Blender 4.2+ and do File > New (a throwaway scene).
-  2. Scripting tab > paste this whole file > check SOURCE_PATH below > Run.
+  2. Scripting tab > Text > Open > pick this file (so __file__ resolves) > Run.
   3. Copy the printed report (Window > Toggle System Console on Windows, or the
      Scripting tab's console) back to me.
   4. Close Blender WITHOUT saving — the appended blocks were only for inspection.
@@ -20,11 +20,16 @@ import os
 from mathutils import Vector
 
 # ---------------------------------------------------------------------------
-# Set this to your all_blocks.blend. Default assumes the repo layout; if Blender
-# can't find it, paste an absolute path here. (bpy runs from Blender's working
-# directory, not the repo, so we can't rely on a relative path.)
+# The repo root is derived from this script's own location, so it works wherever
+# the repo is cloned — provided you ran the file via Text > Open (which sets
+# __file__). If you pasted the script into a fresh text block instead, __file__
+# won't exist; set SOURCE_PATH to your all_blocks.blend by hand below.
 # ---------------------------------------------------------------------------
-SOURCE_PATH = r"C:\Users\shuan\Documents\personal\Coding\snapblock\source_blocks\all_blocks.blend"
+try:
+    REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+except NameError:
+    REPO = ""   # e.g. r"D:\code\snapblock" — only needed if you pasted the script
+SOURCE_PATH = os.path.join(REPO, "source_blocks", "all_blocks.blend")
 
 COLLECTION_NAME = "blocks"   # the collection inside the source file
 U = 0.002                    # 2mm grid unit, in Blender meters (see brief)

@@ -8,7 +8,7 @@ out in a row on the floor so you can look at each one.
 
 HOW TO RUN
   1. Open Blender 4.2+ and do File > New (throwaway scene).
-  2. Scripting tab > paste this whole file > check LIBRARY_PATH > Run.
+  2. Scripting tab > Text > Open > pick this file (so __file__ resolves) > Run.
   3. Hover the mouse over the 3D viewport and press Home to frame everything.
   4. Click any block in the Outliner to see its name. Close without saving.
 """
@@ -16,8 +16,15 @@ HOW TO RUN
 import bpy
 import os
 
-LIBRARY_PATH = r"C:\Users\shuan\Documents\personal\Coding\snapblock\snapblock\snapblock_library.blend"
-GAP = 2.0   # space between blocks, in Blender units (one grid cell)
+# Repo root is derived from this script's location, so it works wherever the
+# repo is cloned — provided you ran the file via Text > Open (which sets
+# __file__). If you pasted the script instead, set LIBRARY_PATH by hand below.
+try:
+    REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+except NameError:
+    REPO = ""   # e.g. r"D:\code\snapblock" — only needed if you pasted the script
+LIBRARY_PATH = os.path.join(REPO, "snapblock", "snapblock_library.blend")
+GAP = 1.0   # space between blocks, in Blender units (one grid cell)
 
 
 def main():

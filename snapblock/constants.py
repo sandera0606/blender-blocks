@@ -6,11 +6,13 @@ from here so there's one place to change them.
 """
 
 # --- Grid ------------------------------------------------------------------
-# One grid cell = 2.0 Blender units (the blocks' native modeling scale). See
-# SNAPBLOCK_BRIEF.md "Grid system". Placements are stored as integer grid coords
-# (gx, gy, gz) and converted to world coords as (gx*U, gy*U, gz*H).
-U = 2.0   # cell size on X and Y, in Blender units
-H = 2.0   # block body height on Z (one cell). Studs add ~0.5 on top.
+# One grid cell = 1.0 Blender unit. The blocks are authored at 2.0 BU/cell, but
+# build_library.py halves them so a cell equals one native Blender unit — that way
+# Blender's default grid and increment-snap (which step by 1.0) line up with cells,
+# and a block at cell (gx, gy, gz) sits at world (gx, gy, gz). Placements are stored
+# as integer grid coords and converted to world coords as (gx*U, gy*U, gz*H).
+U = 1.0   # cell size on X and Y, in Blender units
+H = 1.0   # block body height on Z (one cell). Studs add a little on top.
 
 # --- Names / UI ------------------------------------------------------------
 ADDON_CATEGORY = "SnapBlock"            # the N-panel tab name
@@ -45,6 +47,12 @@ BLOCK_TYPES = (
     ("20x10",      "20×10"),
     ("20x20",      "20×20"),
 )
+
+# --- Materials -------------------------------------------------------------
+# One material per color, named "SnapBlock_<colorname>", Principled BSDF only.
+MATERIAL_PREFIX = "SnapBlock_"
+MATERIAL_ROUGHNESS = 0.4     # plastic-ish — not glossy, not flat
+MATERIAL_SUBSURFACE = 0.1    # a touch of subsurface for a plastic feel
 
 # --- Color presets ---------------------------------------------------------
 # (name, (r, g, b, a)). Applied later as Principled BSDF base color on a
