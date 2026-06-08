@@ -1,0 +1,3 @@
+# Manual generator deps (standalone — NOT part of the shipped add-on).
+# Pure-Python, pip-installable, no system libraries (works cleanly on Windows).
+reportlab>=4.0

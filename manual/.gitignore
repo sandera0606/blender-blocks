@@ -1,0 +1,4 @@
+# Generated manual output (regenerate with: python -m manual.generate ...)
+*_manual.pdf
+_preview_*.png
+__pycache__/
