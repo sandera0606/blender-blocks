@@ -2,9 +2,9 @@
 SnapBlock panels — the N-panel UI in the 3D viewport sidebar.
 
 Structure (salvaged from the legacy add-on's main-panel + subpanel pattern):
-  SNAPBLOCK_PT_main      the tab header + reveal toggle
+  SNAPBLOCK_PT_main      the tab header
    ├─ SNAPBLOCK_PT_blocks   grid of block buttons
-   └─ SNAPBLOCK_PT_colors   grid of color swatches
+   └─ SNAPBLOCK_PT_colors   grid of material swatches + "Add material…"
 
 bpy notes:
   - bl_space_type='VIEW_3D' + bl_region_type='UI' puts the panel in the N-panel.
@@ -14,11 +14,9 @@ bpy notes:
   - A subpanel is just a Panel with bl_parent_id = the parent's bl_idname.
 """
 
-import textwrap
-
 import bpy
 
-from . import constants, reveal
+from . import constants, prefs
 
 
 class SNAPBLOCK_PT_main(bpy.types.Panel):
@@ -30,26 +28,6 @@ class SNAPBLOCK_PT_main(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        scene = context.scene
-
-        # The reveal toggle is the headline feature — keep it at the very top.
-        layout.prop(scene, "snapblock_reveal",
-                    text="Show me what's really happening", toggle=True)
-
-        # When reveal is on, the explanation of the last action sits directly under
-        # the toggle so the two read as one feature. (This is the calm replacement
-        # for the old viewport flash; reveal.note() sets the text, get_note() reads
-        # it.) layout.label doesn't wrap, so we wrap and emit one label per line.
-        if scene.snapblock_reveal:
-            box = layout.box()
-            box.label(text="What just happened", icon='INFO')
-            note = reveal.get_note()
-            if note:
-                for line in textwrap.wrap(note, width=34):
-                    box.label(text=line)
-            else:
-                box.label(text="Do something and I'll explain it here.")
-
         layout.label(text="Pick a block below to start building.")
 
 
@@ -73,7 +51,7 @@ class SNAPBLOCK_PT_blocks(bpy.types.Panel):
 
 
 class SNAPBLOCK_PT_colors(bpy.types.Panel):
-    bl_label = "Colors"
+    bl_label = "Materials"
     bl_idname = "SNAPBLOCK_PT_colors"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -82,13 +60,21 @@ class SNAPBLOCK_PT_colors(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Select blocks, then click a color:")
+        layout.label(text="Select blocks, then click a material:")
 
+        # prefs.iter_materials yields the built-in presets followed by the user's
+        # custom materials — one source of truth, so new materials appear here for free.
         grid = layout.grid_flow(row_major=True, columns=2, even_columns=True)
-        for name, _rgba in constants.COLOR_PRESETS:
-            # Same operator per swatch, parameterised by which preset to apply.
-            op = grid.operator("snapblock.apply_color", text=name)
-            op.color_name = name
+        for name, _spec in prefs.iter_materials(context):
+            # Same operator per swatch, parameterised by which material to apply.
+            op = grid.operator("snapblock.apply_material", text=name)
+            op.material_name = name
+
+        layout.separator()
+        col = layout.column(align=True)
+        col.operator("snapblock.add_material", text="Add material…", icon='ADD')
+        col.operator("snapblock.add_material_from_existing",
+                     text="Add from material…", icon='MATERIAL')
 
 
 class SNAPBLOCK_PT_move(bpy.types.Panel):
@@ -125,31 +111,32 @@ class SNAPBLOCK_PT_move(bpy.types.Panel):
                 op.dx, op.dy, op.dz = dx, dy, dz
 
 
-class SNAPBLOCK_PT_glossary(bpy.types.Panel):
-    """Plain-English definitions of the Blender words SnapBlock uses. Only appears
-    when reveal mode is on — that's what poll() controls."""
-    bl_label = "What these words mean"
-    bl_idname = "SNAPBLOCK_PT_glossary"
+class SNAPBLOCK_PT_edit(bpy.types.Panel):
+    """Rotate or delete the selected blocks. Both are real Blender edits — rotate
+    changes each object's Rotation (keeping it on the grid); delete removes the
+    object outright (Ctrl+Z brings it back)."""
+    bl_label = "Rotate & Delete"
+    bl_idname = "SNAPBLOCK_PT_edit"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_parent_id = "SNAPBLOCK_PT_main"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        # A panel is shown only if poll() returns True — so the glossary is hidden
-        # entirely until the user turns reveal mode on.
-        return context.scene.snapblock_reveal
 
     def draw(self, context):
         layout = self.layout
-        for term, definition in reveal.CONCEPTS:
-            box = layout.box()
-            box.label(text=term, icon='INFO')
-            # bpy note: layout.label doesn't wrap, so wrap the text ourselves and
-            # emit one label per line.
-            for line in textwrap.wrap(definition, width=34):
-                box.label(text=line)
+        layout.label(text="Turn the selected blocks:")
+
+        # Two buttons calling the one rotate operator with opposite steps. As with
+        # the nudge buttons, set the property on every button so the last-used value
+        # never bleeds across clicks (see SNAPBLOCK_PT_move's note).
+        row = layout.row(align=True)
+        op = row.operator("snapblock.rotate", text="Left 90°")
+        op.steps = 1
+        op = row.operator("snapblock.rotate", text="Right 90°")
+        op.steps = -1
+
+        layout.separator()
+        # icon='TRASH' reads as "delete" at a glance.
+        layout.operator("snapblock.delete", text="Delete selected", icon='TRASH')
 
 
 classes = (
@@ -157,5 +144,5 @@ classes = (
     SNAPBLOCK_PT_blocks,
     SNAPBLOCK_PT_colors,
     SNAPBLOCK_PT_move,
-    SNAPBLOCK_PT_glossary,
+    SNAPBLOCK_PT_edit,
 )

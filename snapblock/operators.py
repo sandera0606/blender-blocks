@@ -1,17 +1,26 @@
 """
 SnapBlock operators — one bpy.types.Operator per user action.
 
-  - SNAPBLOCK_OT_add_block:   append a block from the library at the snapped cursor.
-  - SNAPBLOCK_OT_apply_color: color the selected blocks with a preset material.
+  - SNAPBLOCK_OT_add_block:       append a block from the library at the snapped cursor.
+  - SNAPBLOCK_OT_apply_material:  give the selected blocks a material (preset or custom).
+  - SNAPBLOCK_OT_add_material:    make a custom material and save it to the library.
+  - SNAPBLOCK_OT_add_material_from_existing: capture an existing material into the library.
+  - SNAPBLOCK_OT_remove_material: drop a custom material from the library.
+  - SNAPBLOCK_OT_nudge:           move the selected blocks by whole grid cells.
+  - SNAPBLOCK_OT_rotate:          turn the selected blocks 90° about Z, staying on grid.
+  - SNAPBLOCK_OT_delete:          remove the selected blocks from the scene.
 
 bpy note: every user action in Blender is a bpy.types.Operator. The class needs
 a unique bl_idname in the form "category.action" (lowercase, one dot); that's the
 string the UI calls via layout.operator("snapblock.add_block").
 """
 
-import bpy
+import math
 
-from . import constants, library, reveal
+import bpy
+from mathutils import Matrix, Vector
+
+from . import constants, library, prefs
 
 
 class SNAPBLOCK_OT_add_block(bpy.types.Operator):
@@ -25,16 +34,6 @@ class SNAPBLOCK_OT_add_block(bpy.types.Operator):
     # Which block to add. The panel button sets this; the operator does exactly one
     # thing (no branching) so there's one operator per user action.
     type_id: bpy.props.StringProperty()
-
-    @classmethod
-    def description(cls, context, properties):
-        # A dynamic description() classmethod overrides bl_description for the
-        # tooltip — here it expands to name the real bpy call when reveal is on.
-        text = "Add this block at the 3D cursor, snapped to the grid"
-        if context and getattr(context.scene, "snapblock_reveal", False):
-            text += ("\n\nReveal: appends a mesh object via bpy.data.libraries.load() "
-                     "into the 'SnapBlock Build' collection.")
-        return text
 
     def execute(self, context):
         # Loading can fail two friendly ways: the bundled library is missing, or the
@@ -86,27 +85,23 @@ class SNAPBLOCK_OT_add_block(bpy.types.Operator):
         tool_settings.snap_elements = {'INCREMENT'}
         tool_settings.use_snap_grid_absolute = True
 
-        # Glass-box status message: name the real Blender object and where it lives.
+        # Status message: name the real Blender object and where it lives.
         message = ("Added {} — a normal mesh object in the '{}' collection "
                    "(see the Outliner).").format(obj.name, constants.BUILD_COLLECTION)
-        if context.scene.snapblock_reveal:
-            message += " [appended via bpy.data.libraries.load]"
-            reveal.note("You added an Object — a real item in your scene. "
-                        "Find it in the Outliner, top-right.")
         self.report({'INFO'}, message)
         return {'FINISHED'}
 
 
-def _get_or_create_material(color_name, rgba):
-    """Return the shared 'SnapBlock_<colorname>' material, creating it once if
-    needed. One material per color, reused across every block of that color.
+def _get_or_create_material(name, rgb, roughness, opacity, transmission):
+    """Return the shared 'SnapBlock_<name>' material, creating it once if needed.
+    One material per name, reused across every block that uses it.
 
     Principled BSDF only (no custom node graph). bpy note: modern materials are
     defined by their node tree, so we set use_nodes=True and edit the Principled
     node — never use_nodes=False, which gives flat viewport-only color and breaks
     the BSDF the look depends on.
     """
-    mat_name = constants.MATERIAL_PREFIX + color_name
+    mat_name = constants.MATERIAL_PREFIX + name
     mat = bpy.data.materials.get(mat_name)
     if mat is not None:
         return mat
@@ -116,51 +111,63 @@ def _get_or_create_material(color_name, rgba):
     # Grab the Principled node by type, not by name — the label can be localised
     # or renamed, but the type is stable.
     bsdf = next(n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
-    bsdf.inputs["Base Color"].default_value = rgba
-    bsdf.inputs["Roughness"].default_value = constants.MATERIAL_ROUGHNESS
+    bsdf.inputs["Base Color"].default_value = (rgb[0], rgb[1], rgb[2], 1.0)
+    bsdf.inputs["Roughness"].default_value = roughness
+    bsdf.inputs["Alpha"].default_value = opacity
     # Subsurface input was renamed to "Subsurface Weight" in Blender 4.x; guard the
     # set so a version mismatch degrades gracefully instead of raising KeyError.
     if "Subsurface Weight" in bsdf.inputs:
         bsdf.inputs["Subsurface Weight"].default_value = constants.MATERIAL_SUBSURFACE
+    # Transmission ("Clear") makes a block see-through like glass. Also renamed to
+    # "Transmission Weight" in Blender 4.x; guard it the same way.
+    if "Transmission Weight" in bsdf.inputs:
+        bsdf.inputs["Transmission Weight"].default_value = transmission
 
-    # So the color is visible in Solid shading too (base color only shows in
-    # Material Preview / Rendered) — beginners are often in Solid mode.
-    mat.diffuse_color = rgba
+    # bpy gotcha: alpha/transmission only show as see-through in EEVEE if the
+    # material's render method allows blending. Blender 4.2 EEVEE Next uses
+    # `surface_render_method` ('BLENDED'); older EEVEE used `blend_method` ('BLEND').
+    # Cycles ignores both and is always correct. Set whichever this build has.
+    if opacity < 1.0 or transmission > 0.0:
+        if hasattr(mat, "surface_render_method"):
+            mat.surface_render_method = 'BLENDED'
+        elif hasattr(mat, "blend_method"):
+            mat.blend_method = 'BLEND'
+
+    # So the look is visible in Solid shading too (BSDF inputs only show in Material
+    # Preview / Rendered). Alpha here drives the Solid-view opacity.
+    mat.diffuse_color = (rgb[0], rgb[1], rgb[2], opacity)
     return mat
 
 
-class SNAPBLOCK_OT_apply_color(bpy.types.Operator):
-    """Apply a preset color to the selected blocks as a real Blender material."""
-    bl_idname = "snapblock.apply_color"
-    bl_label = "Apply color"
-    bl_description = "Color the selected blocks with this preset"
+class SNAPBLOCK_OT_apply_material(bpy.types.Operator):
+    """Give the selected blocks a material — a preset or one of your custom ones —
+    as a real Blender material."""
+    bl_idname = "snapblock.apply_material"
+    bl_label = "Apply material"
+    bl_description = "Give the selected blocks this material"
     bl_options = {'REGISTER', 'UNDO'}
 
-    # Which preset to apply. The swatch button sets this; one operator, one action.
-    color_name: bpy.props.StringProperty()
-
-    @classmethod
-    def description(cls, context, properties):
-        text = "Color the selected blocks with this preset"
-        if context and getattr(context.scene, "snapblock_reveal", False):
-            text += ("\n\nReveal: creates/reuses a 'SnapBlock_<color>' material "
-                     "(Principled BSDF) and assigns it to each selected object.")
-        return text
+    # Which material to apply, by name. The swatch button sets this; one operator,
+    # one action.
+    material_name: bpy.props.StringProperty()
 
     def execute(self, context):
         targets = [o for o in context.selected_objects if o.type == 'MESH']
         if not targets:
-            self.report({'ERROR'}, "Select one or more blocks first, then pick a color.")
+            self.report({'ERROR'}, "Select one or more blocks first, then pick a material.")
             return {'CANCELLED'}
 
-        # Look the RGBA up by name so constants.COLOR_PRESETS stays the one source
-        # of truth for color. Shouldn't be missing when called from the UI.
-        rgba = dict(constants.COLOR_PRESETS).get(self.color_name)
-        if rgba is None:
-            self.report({'ERROR'}, "Unknown color '{}'.".format(self.color_name))
+        # Look the recipe up by name so prefs.iter_materials stays the one source of
+        # truth (presets + custom). Shouldn't be missing when called from the UI.
+        spec = prefs.get_material_spec(context, self.material_name)
+        if spec is None:
+            self.report({'ERROR'}, "Unknown material '{}'.".format(self.material_name))
             return {'CANCELLED'}
 
-        mat = _get_or_create_material(self.color_name, rgba)
+        mat = _get_or_create_material(
+            spec["name"], spec["color"], spec["roughness"],
+            spec["opacity"], spec["transmission"],
+        )
 
         # Assign to each block's mesh data. Each placed block is its own append, so
         # meshes aren't shared — data-level assignment is the standard, safe choice.
@@ -172,11 +179,190 @@ class SNAPBLOCK_OT_apply_color(bpy.types.Operator):
 
         message = ("Applied '{}' to {} block(s). Find it in the Properties panel "
                    "→ Material tab.").format(mat.name, len(targets))
-        if context.scene.snapblock_reveal:
-            message += " [Principled BSDF base color on each object's mesh material]"
-            reveal.note("You applied a Material — the block's color and finish. "
-                        "Find it in the Material tab on the right.")
         self.report({'INFO'}, message)
+        return {'FINISHED'}
+
+
+# Finish-preset lookups, built once from the constants table.
+#   _FINISH_ENUM_ITEMS: EnumProperty items (id, label, description).
+#   _FINISH_LOOKUP:     id -> (roughness, opacity, transmission).
+# bpy gotcha: EnumProperty items given as a static tuple keep their strings alive;
+# a *callback* that returns freshly-built strings can have them garbage-collected
+# and show garbled labels, so prefer the static list when the choices are fixed.
+_FINISH_ENUM_ITEMS = tuple(
+    (pid, label, "{} finish".format(label))
+    for pid, label, _r, _o, _t in constants.FINISH_PRESETS
+)
+_FINISH_LOOKUP = {pid: (r, o, t) for pid, _label, r, o, t in constants.FINISH_PRESETS}
+
+
+class SNAPBLOCK_OT_add_material(bpy.types.Operator):
+    """Make a custom material (name + color + finish) and save it to your library,
+    so it shows up as a swatch in every file. The finish preset sets the
+    roughness/opacity/transmission; to capture a fully custom look, build a material
+    in the shader editor and use 'Add from material' instead."""
+    bl_idname = "snapblock.add_material"
+    bl_label = "Add material"
+    bl_description = "Create a custom material and add it to your library"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    name: bpy.props.StringProperty(name="Name", default="My material")
+    color: bpy.props.FloatVectorProperty(
+        name="Color", subtype='COLOR', size=3, min=0.0, max=1.0,
+        default=(0.8, 0.8, 0.8),
+    )
+    finish: bpy.props.EnumProperty(
+        name="Finish", items=_FINISH_ENUM_ITEMS, default=_FINISH_ENUM_ITEMS[0][0],
+    )
+
+    def invoke(self, context, event):
+        # invoke_props_dialog pops a small modal dialog (auto-drawing our props:
+        # name, color, finish) before execute() runs.
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        name = self.name.strip()
+        if not name:
+            self.report({'ERROR'}, "Give the material a name first.")
+            return {'CANCELLED'}
+        if prefs.material_name_exists(context, name):
+            self.report({'ERROR'},
+                        "A material called '{}' already exists — pick another name."
+                        .format(name))
+            return {'CANCELLED'}
+
+        # The finish preset fully determines the look (no fine-tune sliders).
+        roughness, opacity, transmission = _FINISH_LOOKUP[self.finish]
+
+        item = prefs.addon_prefs(context).custom_materials.add()
+        item.name = name
+        item.color = self.color
+        item.roughness = roughness
+        item.opacity = opacity
+        item.transmission = transmission
+
+        # Persist to disk so the material is there next session, even if Blender's
+        # "Auto-Save Preferences" is off. This is the one place SnapBlock writes the
+        # global user preferences.
+        bpy.ops.wm.save_userpref()
+
+        note = ""
+        if transmission > 0.0:
+            note = (" Heads-up: transmission only looks see-through in EEVEE with "
+                    "Raytracing / Screen-Space Refraction on — it always works in "
+                    "Cycles.")
+        self.report({'INFO'}, "Added material '{}'.{}".format(name, note))
+        return {'FINISHED'}
+
+
+class SNAPBLOCK_OT_remove_material(bpy.types.Operator):
+    """Remove one of your custom materials from the library. The built-in color
+    presets can't be removed."""
+    bl_idname = "snapblock.remove_material"
+    bl_label = "Remove material"
+    bl_description = "Remove this custom material from your library"
+    bl_options = {'REGISTER'}   # preferences aren't part of Blender's undo stack
+
+    name: bpy.props.StringProperty()
+
+    def execute(self, context):
+        coll = prefs.addon_prefs(context).custom_materials
+        # CollectionProperty removes by index, not by name, so find the index first.
+        index = next((i for i, it in enumerate(coll) if it.name == self.name), -1)
+        if index < 0:
+            self.report({'ERROR'}, "No custom material called '{}'.".format(self.name))
+            return {'CANCELLED'}
+
+        coll.remove(index)
+        bpy.ops.wm.save_userpref()
+        self.report({'INFO'}, "Removed material '{}'.".format(self.name))
+        return {'FINISHED'}
+
+
+def _read_principled(mat):
+    """Read (rgb, roughness, opacity, transmission) off a material's Principled
+    BSDF, or None if it hasn't got one. Reads the node inputs' default_value, so a
+    color driven by a texture node comes back as whatever constant sits behind it."""
+    if not mat.use_nodes or mat.node_tree is None:
+        return None
+    bsdf = next((n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+    if bsdf is None:
+        return None
+    base = bsdf.inputs["Base Color"].default_value
+    transmission = (bsdf.inputs["Transmission Weight"].default_value
+                    if "Transmission Weight" in bsdf.inputs else 0.0)
+    return ((base[0], base[1], base[2]),
+            bsdf.inputs["Roughness"].default_value,
+            bsdf.inputs["Alpha"].default_value,
+            transmission)
+
+
+def _on_source_change(self, context):
+    """When the source material is picked, default the library name to it (minus our
+    SnapBlock_ prefix) — but only if the user hasn't typed their own name yet."""
+    mat = bpy.data.materials.get(self.source_name)
+    if mat is not None and not self.name:
+        n = mat.name
+        if n.startswith(constants.MATERIAL_PREFIX):
+            n = n[len(constants.MATERIAL_PREFIX):]
+        self.name = n
+
+
+class SNAPBLOCK_OT_add_material_from_existing(bpy.types.Operator):
+    """Add one of this file's existing materials to your SnapBlock library by reading
+    its Principled BSDF (color, roughness, opacity, transmission). The handy way to
+    capture a fully custom look: build it in the shader editor, then grab it here."""
+    bl_idname = "snapblock.add_material_from_existing"
+    bl_label = "Add from material"
+    bl_description = "Copy an existing material in this file into your SnapBlock library"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    source_name: bpy.props.StringProperty(name="Material", update=_on_source_change)
+    name: bpy.props.StringProperty(name="Save as", default="")
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        # prop_search gives a searchable dropdown of every material in the .blend.
+        layout.prop_search(self, "source_name", bpy.data, "materials", text="Material")
+        layout.prop(self, "name")
+
+    def execute(self, context):
+        mat = bpy.data.materials.get(self.source_name)
+        if mat is None:
+            self.report({'ERROR'}, "Pick an existing material to copy first.")
+            return {'CANCELLED'}
+
+        read = _read_principled(mat)
+        if read is None:
+            self.report({'ERROR'},
+                        "'{}' has no Principled BSDF I can read.".format(mat.name))
+            return {'CANCELLED'}
+        rgb, roughness, opacity, transmission = read
+
+        name = self.name.strip()
+        if not name:
+            # Fall back to the source name, minus our prefix.
+            name = mat.name
+            if name.startswith(constants.MATERIAL_PREFIX):
+                name = name[len(constants.MATERIAL_PREFIX):]
+        if prefs.material_name_exists(context, name):
+            self.report({'ERROR'},
+                        "A material called '{}' already exists — pick another name."
+                        .format(name))
+            return {'CANCELLED'}
+
+        item = prefs.addon_prefs(context).custom_materials.add()
+        item.name = name
+        item.color = rgb
+        item.roughness = roughness
+        item.opacity = opacity
+        item.transmission = transmission
+        bpy.ops.wm.save_userpref()
+
+        self.report({'INFO'}, "Added material '{}' from '{}'.".format(name, mat.name))
         return {'FINISHED'}
 
 
@@ -203,14 +389,6 @@ class SNAPBLOCK_OT_nudge(bpy.types.Operator):
         # instead of being swallowed.
         return any(o.type == 'MESH' for o in context.selected_objects)
 
-    @classmethod
-    def description(cls, context, properties):
-        text = "Move the selected blocks one cell along the grid"
-        if context and getattr(context.scene, "snapblock_reveal", False):
-            text += ("\n\nReveal: adds a whole-cell offset to each object's "
-                     "location (obj.location += cells × grid size).")
-        return text
-
     def execute(self, context):
         targets = [o for o in context.selected_objects if o.type == 'MESH']
         # poll() normally prevents this, but keep a friendly guard in case the
@@ -229,10 +407,110 @@ class SNAPBLOCK_OT_nudge(bpy.types.Operator):
 
         message = ("Moved {} block(s) by one cell — still on the grid."
                    .format(len(targets)))
-        if context.scene.snapblock_reveal:
-            message += " [obj.location += cells × grid size]"
-            reveal.note("You moved the block by exactly one grid cell, so it stays "
-                        "snapped — that's its Location changing.")
+        self.report({'INFO'}, message)
+        return {'FINISHED'}
+
+
+def _snap_to_grid(obj, context):
+    """Shift `obj` so the minimum corner of its footprint lands on the grid.
+
+    Used after rotating: a 90° turn can leave odd-dimension blocks (e.g. 1x3)
+    half a cell off the lattice. We snap the world-space bounding-box min corner
+    to the nearest cell, which nudges the block back onto the grid by at most
+    half a cell.
+
+    bpy gotcha: obj.matrix_world is recomputed lazily, so after we change
+    location/rotation it's stale until the view layer updates. Force that update
+    before reading bound_box corners, or we'd snap using the *old* transform.
+    """
+    context.view_layer.update()
+    mw = obj.matrix_world
+    corners = [mw @ Vector(c) for c in obj.bound_box]
+    min_x = min(v.x for v in corners)
+    min_y = min(v.y for v in corners)
+    min_z = min(v.z for v in corners)
+    obj.location.x += round(min_x / constants.U) * constants.U - min_x
+    obj.location.y += round(min_y / constants.U) * constants.U - min_y
+    obj.location.z += round(min_z / constants.H) * constants.H - min_z
+
+
+class SNAPBLOCK_OT_rotate(bpy.types.Operator):
+    """Turn the selected blocks 90° around the up (Z) axis, pivoting about each
+    block's own footprint center so it spins in place and stays on the grid."""
+    bl_idname = "snapblock.rotate"
+    bl_label = "Rotate block"
+    bl_description = "Turn the selected blocks 90° around the up axis"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    # +1 = one 90° step counter-clockwise (seen from above), -1 = clockwise. A
+    # panel button sets this; one operator, parameterised — no branching.
+    steps: bpy.props.IntProperty(default=1)
+
+    @classmethod
+    def poll(cls, context):
+        return any(o.type == 'MESH' for o in context.selected_objects)
+
+    def execute(self, context):
+        targets = [o for o in context.selected_objects if o.type == 'MESH']
+        if not targets:
+            self.report({'ERROR'}, "Select a block to rotate.")
+            return {'CANCELLED'}
+
+        angle = self.steps * (math.pi / 2)
+        rot = Matrix.Rotation(angle, 4, 'Z')
+
+        for obj in targets:
+            # Pivot point = the block's footprint center in world space. bound_box
+            # is 8 local corners; averaging them gives the center regardless of
+            # where the origin sits (ours is at the bottom -X/-Y corner).
+            local_center = sum((Vector(c) for c in obj.bound_box), Vector()) / 8
+            pivot = obj.matrix_world @ local_center
+
+            # Rigid rotation of the whole object about `pivot`: every point x maps
+            # to pivot + rot·(x − pivot). Applying that to the origin gives the new
+            # location; composing rot onto the existing orientation turns the block.
+            # Doing the math with mathutils (not by re-reading matrix_world) means
+            # we don't depend on a depsgraph refresh mid-loop.
+            obj.location = pivot + rot @ (obj.location - pivot)
+            obj.rotation_euler.rotate_axis('Z', angle)
+
+            # Re-snap so odd-dimension blocks land cleanly back on the lattice.
+            _snap_to_grid(obj, context)
+
+        direction = "left" if self.steps > 0 else "right"
+        message = ("Turned {} block(s) 90° {} — still on the grid."
+                   .format(len(targets), direction))
+        self.report({'INFO'}, message)
+        return {'FINISHED'}
+
+
+class SNAPBLOCK_OT_delete(bpy.types.Operator):
+    """Remove the selected blocks from the scene entirely."""
+    bl_idname = "snapblock.delete"
+    bl_label = "Delete block"
+    bl_description = "Remove the selected blocks from the scene"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return any(o.type == 'MESH' for o in context.selected_objects)
+
+    def execute(self, context):
+        targets = [o for o in context.selected_objects if o.type == 'MESH']
+        if not targets:
+            self.report({'ERROR'}, "Select a block to delete.")
+            return {'CANCELLED'}
+
+        count = len(targets)
+        # bpy note: bpy.data.objects.remove(do_unlink=True) unlinks the object from
+        # every collection and deletes the object data-block in one call — cleaner
+        # and more predictable than bpy.ops.object.delete(), which depends on the
+        # right context override. The block's mesh is left as 0-user "orphan data"
+        # (normal Blender behaviour — it's purged on save or via Outliner cleanup).
+        for obj in targets:
+            bpy.data.objects.remove(obj, do_unlink=True)
+
+        message = "Deleted {} block(s).".format(count)
         self.report({'INFO'}, message)
         return {'FINISHED'}
 
@@ -242,6 +520,11 @@ class SNAPBLOCK_OT_nudge(bpy.types.Operator):
 # which is why operators register before panels.
 classes = (
     SNAPBLOCK_OT_add_block,
-    SNAPBLOCK_OT_apply_color,
+    SNAPBLOCK_OT_apply_material,
+    SNAPBLOCK_OT_add_material,
+    SNAPBLOCK_OT_add_material_from_existing,
+    SNAPBLOCK_OT_remove_material,
     SNAPBLOCK_OT_nudge,
+    SNAPBLOCK_OT_rotate,
+    SNAPBLOCK_OT_delete,
 )

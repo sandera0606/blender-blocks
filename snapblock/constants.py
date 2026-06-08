@@ -57,6 +57,7 @@ MATERIAL_SUBSURFACE = 0.1    # a touch of subsurface for a plastic feel
 # --- Color presets ---------------------------------------------------------
 # (name, (r, g, b, a)). Applied later as Principled BSDF base color on a
 # material named "SnapBlock_<name>". Values are friendly sRGB-ish picks.
+# These are the built-in materials; the user can add their own (see prefs.py).
 COLOR_PRESETS = (
     ("White",  (0.90, 0.90, 0.90, 1.0)),
     ("Black",  (0.02, 0.02, 0.02, 1.0)),
@@ -66,4 +67,20 @@ COLOR_PRESETS = (
     ("Green",  (0.10, 0.50, 0.12, 1.0)),
     ("Blue",   (0.05, 0.15, 0.60, 1.0)),
     ("Gray",   (0.30, 0.30, 0.30, 1.0)),
+)
+
+# --- Finish presets --------------------------------------------------------
+# Seeds for a custom material's look. (id, label, roughness, opacity, transmission).
+# Picking a finish in the Add Material dialog copies these into the fine-tune
+# sliders; the slider values are what actually get stored, so a finish is just a
+# convenient starting point.
+#   Matte       - solid, soft plastic
+#   Glossy      - solid, shiny plastic
+#   Translucent - frosted / see-through via alpha (opacity < 1)
+#   Clear       - clear plastic / glass via transmission (needs raytracing in EEVEE)
+FINISH_PRESETS = (
+    ("MATTE",       "Matte",       0.6,  1.0, 0.0),
+    ("GLOSSY",      "Glossy",      0.15, 1.0, 0.0),
+    ("TRANSLUCENT", "Translucent", 0.4,  0.5, 0.0),
+    ("CLEAR",       "Clear",       0.05, 1.0, 1.0),
 )

@@ -6,16 +6,15 @@ Keep it out of any shipped zip.
 
 ## About SnapBlock
 
-SnapBlock is a **Blender 4.2+ add-on** that puts a snap-block toy on top of a
-real Blender scene — the goal is to teach Blender through play, not to build a
-walled garden inside it. Beginners place blocks on a 2mm grid, color them, and
-end up with normal Blender objects, materials, and collections they can keep
-working with. Its defining feature is **Reveal mode** ("show me what's really
-happening"), which surfaces the actual Blender data behind the toy.
+SnapBlock is a **Blender 4.2+ add-on** — a personal snap-block toy on top of a
+real Blender scene. Place blocks on a grid, color them, and end up with normal
+Blender objects, materials, and collections you can keep editing by hand.
+Glass-box by design: nothing is faked or hidden, so the scene survives without
+the add-on.
 
 See `SNAPBLOCK_BRIEF.md` (repo root) for the full design and `CLAUDE.md` for the
 working rules — notably: the block library in `source_blocks/all_blocks.blend`
-is **read-only**, and the blocks are never called "LEGO" or "bricks."
+is **read-only**, and the blocks are called "blocks," not "LEGO" or "bricks."
 
 ### Why this bridge exists
 
