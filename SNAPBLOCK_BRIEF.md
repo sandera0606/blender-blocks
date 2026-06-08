@@ -42,6 +42,28 @@ behind a real, editable Blender scene I can keep tinkering with by hand.
 - **Not real LEGO proportions.** Custom geometry. Refer to them as "blocks" or "snap
   blocks", never "LEGO" or "bricks."
 
+### Custom blocks (added 2026-06-07)
+
+Beyond the built-in catalogue, blocks can be captured **in Blender** from any selection:
+the **Add block from selection…** button (Blocks panel) takes the active mesh object,
+makes a clean copy (bakes in rotation/scale, re-origins to the bottom -X/-Y corner,
+strips materials — the original object is left untouched), and saves it. Removal is in
+the same panel and in Add-on prefs.
+
+- **Storage:** one `.blend` per custom block under Blender's per-user CONFIG dir
+  (`config/snapblock/custom_blocks/<type_id>.blend`), *outside* the package — so an
+  add-on reinstall never wipes them. A lightweight pointer (display name + slug
+  `type_id`) lives in `AddonPreferences.custom_blocks`; `prefs.iter_blocks()` is the one
+  source of truth the panel reads (built-ins, then customs). This mirrors how custom
+  *materials* are stored.
+- **Validation:** the X/Y footprint must be a whole number of cells (else it's refused
+  with a friendly message — we don't silently round). Z is not checked against whole
+  cells, since studs make a block stand a little over 1.0. Stud/height alignment with
+  other blocks is the modeler's responsibility — glass-box, edit by hand as needed.
+- **Glass-box still holds:** a placed custom block is an ordinary appended mesh in
+  `SnapBlock Build`, the stored `.blend` is a normal file, and the prefs entry is only a
+  pointer.
+
 ### Pre-flight checklist for the blocks
 
 **Source file specifics:**
@@ -189,7 +211,6 @@ snapblock/
 
 ## Not chasing these (for now)
 
-- Custom block uploads
 - Custom textures
 - Animation tools
 - Export to LDraw or other formats

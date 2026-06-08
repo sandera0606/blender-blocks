@@ -14,14 +14,27 @@ from here so there's one place to change them.
 U = 1.0   # cell size on X and Y, in Blender units
 H = 1.0   # block body height on Z (one cell). Studs add a little on top.
 
+# How close a captured block's footprint must be to a whole number of cells to count
+# as "on the grid". Tight enough to refuse a visibly off-grid block, loose enough to
+# absorb float noise from baking an object's world transform into its mesh.
+GRID_SNAP_TOL = 1e-4
+
 # --- Names / UI ------------------------------------------------------------
 ADDON_CATEGORY = "SnapBlock"            # the N-panel tab name
 BUILD_COLLECTION = "SnapBlock Build"    # collection placed blocks go into
 LIBRARY_FILENAME = "snapblock_library.blend"   # bundled block library
 
+# Custom blocks the user captures from a selection live OUTSIDE the package (so an
+# add-on reinstall can't wipe them), one .blend per block, under this subpath of
+# Blender's per-user CONFIG dir (resolved via bpy.utils.user_resource in prefs.py).
+CUSTOM_BLOCKS_DIRNAME = "snapblock/custom_blocks"
+
 # --- Block catalogue -------------------------------------------------------
-# (type_id, display_label). type_id must match an object name in the library
-# .blend; placed blocks are named "Block_<type_id>.NNN". Ordered small -> large.
+# The BUILT-IN block types. (type_id, display_label). type_id must match an object
+# name in the bundled library .blend; placed blocks are named "Block_<type_id>.NNN".
+# Ordered small -> large. Custom blocks the user captures are NOT listed here — they
+# live in prefs; prefs.iter_blocks() yields these built-ins followed by the custom
+# ones, so the panel shows both from one source of truth.
 # Footprint sizes (in cells) are deliberately omitted until the rotation/
 # orientation question is settled — see tools/check_rotation.py.
 BLOCK_TYPES = (

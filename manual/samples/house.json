@@ -19,7 +19,9 @@
         { "add": [
           { "cell": [0, 1, 0], "type": "1x1", "material": "Gray" },
           { "cell": [1, 1, 0], "type": "1x1", "material": "Gray" },
-          { "cell": [2, 1, 0], "type": "1x1", "material": "Gray" },
+          { "cell": [2, 1, 0], "type": "1x1", "material": "Gray" }
+        ] },
+        { "add": [
           { "cell": [0, 2, 0], "type": "1x1", "material": "Gray" },
           { "cell": [1, 2, 0], "type": "1x1", "material": "Gray" },
           { "cell": [2, 2, 0], "type": "1x1", "material": "Gray" }
@@ -27,27 +29,40 @@
       ]
     },
     {
-      "name": "Walls",
+      "name": "Walls 1",
       "steps": [
         { "add": [
           { "cell": [0, 0, 1], "type": "1x1", "material": "Yellow" },
           { "cell": [1, 0, 1], "type": "1x1", "material": "Yellow" },
-          { "cell": [2, 0, 1], "type": "1x1", "material": "Yellow" },
-          { "cell": [2, 1, 1], "type": "1x1", "material": "Yellow" },
-          { "cell": [2, 2, 1], "type": "1x1", "material": "Yellow" },
-          { "cell": [1, 2, 1], "type": "1x1", "material": "Yellow" },
-          { "cell": [0, 2, 1], "type": "1x1", "material": "Yellow" },
-          { "cell": [0, 1, 1], "type": "1x1", "material": "Yellow" }
+          { "cell": [2, 0, 1], "type": "1x1", "material": "Yellow" }
         ] },
+        { "add": [
+          { "cell": [0, 1, 1], "type": "1x1", "material": "Yellow" },
+          { "cell": [2, 1, 1], "type": "1x1", "material": "Yellow" }
+        ] },
+        { "add": [
+          { "cell": [0, 2, 1], "type": "1x1", "material": "Yellow" },
+          { "cell": [1, 2, 1], "type": "1x1", "material": "Yellow" },
+          { "cell": [2, 2, 1], "type": "1x1", "material": "Yellow" }
+        ] }
+      ]
+    },
+    {
+      "name": "Walls 2",
+      "steps": [
         { "add": [
           { "cell": [0, 0, 2], "type": "1x1", "material": "Yellow" },
           { "cell": [1, 0, 2], "type": "1x1", "material": "Yellow" },
-          { "cell": [2, 0, 2], "type": "1x1", "material": "Yellow" },
-          { "cell": [2, 1, 2], "type": "1x1", "material": "Yellow" },
-          { "cell": [2, 2, 2], "type": "1x1", "material": "Yellow" },
-          { "cell": [1, 2, 2], "type": "1x1", "material": "Yellow" },
+          { "cell": [2, 0, 2], "type": "1x1", "material": "Yellow" }
+        ] },
+        { "add": [
+          { "cell": [0, 1, 2], "type": "1x1", "material": "Yellow" },
+          { "cell": [2, 1, 2], "type": "1x1", "material": "Yellow" }
+        ] },
+        { "add": [
           { "cell": [0, 2, 2], "type": "1x1", "material": "Yellow" },
-          { "cell": [0, 1, 2], "type": "1x1", "material": "Yellow" }
+          { "cell": [1, 2, 2], "type": "1x1", "material": "Yellow" },
+          { "cell": [2, 2, 2], "type": "1x1", "material": "Yellow" }
         ] }
       ]
     },
@@ -57,10 +72,14 @@
         { "add": [
           { "cell": [0, 0, 3], "type": "1x1", "material": "Red" },
           { "cell": [1, 0, 3], "type": "1x1", "material": "Red" },
-          { "cell": [2, 0, 3], "type": "1x1", "material": "Red" },
+          { "cell": [2, 0, 3], "type": "1x1", "material": "Red" }
+        ] },
+        { "add": [
           { "cell": [0, 1, 3], "type": "1x1", "material": "Red" },
           { "cell": [1, 1, 3], "type": "1x1", "material": "Red" },
-          { "cell": [2, 1, 3], "type": "1x1", "material": "Red" },
+          { "cell": [2, 1, 3], "type": "1x1", "material": "Red" }
+        ] },
+        { "add": [
           { "cell": [0, 2, 3], "type": "1x1", "material": "Red" },
           { "cell": [1, 2, 3], "type": "1x1", "material": "Red" },
           { "cell": [2, 2, 3], "type": "1x1", "material": "Red" }

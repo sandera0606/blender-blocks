@@ -28,12 +28,20 @@ never has to load the generator's drawing deps.
     {
       "name": "Base",
       "steps": [
-        { "add": [ { "cell": [0, 0, 0], "type": "1x1", "material": "Gray" } ] }
+        { "add": [
+          { "cell": [0, 0, 0], "type": "4x2", "material": "Gray", "finish": "smooth" },
+          { "cell": [4, 0, 0], "type": "2x2", "material": "Yellow", "finish": "stud",
+            "studs": [[4,0],[5,0],[4,1],[5,1]] }
+        ] }
       ]
     }
   ]
 }
 ```
+
+A build plan is normally produced by `manual/planner.py` from a **voxel model**
+(`vox_import.py` reads MagicaVoxel `.vox` or a voxel JSON); it can also be hand-authored.
+Pipeline: `model.vox → vox_import → voxel model → planner → build plan → generate → PDF`.
 
 ## Fields
 
@@ -49,10 +57,16 @@ never has to load the generator's drawing deps.
   - `name` — bag label (e.g. "Base", "Walls", "Roof").
   - `steps` — ordered list. Each step is one page of the manual.
     - `add` — the blocks placed **in this step** ("the blocks involved in the step").
-      - `cell` — integer grid coords `[gx, gy, gz]`.
-      - `type` — block type id. For v1 this is always `"1x1"` (one block per voxel).
-        Reserved for later: bigger merged blocks (`"2x2"`, `"2x4"`, …).
+      - `cell` — the block's **bottom −X/−Y corner** as integer grid coords `[gx, gy, gz]`
+        (matches the repo's origin convention). The block fills `[gx..gx+W) × [gy..gy+D)`.
+      - `type` — the **as-placed** footprint `"WxD"` (e.g. `"4x2"`, `"1x3"`). The renderer
+        parses W,D from this. The orientation-independent library id is the dims sorted
+        (so `"1x4"` is a `"4x1"` block rotated); parts lists group by that canonical id.
       - `material` — a key into `palette`.
+      - `finish` — `"stud"` or `"smooth"` (optional; default `"stud"`).
+      - `studs` — the footprint cells `[[cx,cy], …]` that show a stud (optional). The
+        planner sets exactly the exposed studded cells; if omitted, a `stud` block defaults
+        to its whole top and a `smooth` block to none.
 
 ## Rules / conventions
 
@@ -64,7 +78,11 @@ never has to load the generator's drawing deps.
 - **A step's diagram shows the cumulative build** up to and including that step, with that
   step's `add` blocks highlighted. The generator accumulates; the plan only stores deltas.
 - **A step's parts list is derived**, not stored: count this step's `add` by
-  `(material, type)`.
+  `(catalogue id, material, finish)`.
+- **Smooth ⟹ nothing on top.** A studless tile can't anchor a block, so a `smooth`
+  block must never have a filled cell directly above any of its cells. Equivalently,
+  any cell with something attached on top must belong to a `stud` block. The planner
+  guarantees this (smooth is only assigned to exposed tops) and asserts it.
 
 ## Not in the format (deliberately)
 

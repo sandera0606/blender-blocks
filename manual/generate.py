@@ -5,11 +5,14 @@ Usage:
     python -m manual.generate manual/samples/house.json
     python -m manual.generate manual/samples/house.json -o house_manual.pdf
 
-One page per step: a header (model / bag / step counter), the isometric diagram of the
-build up to that step (with the step's new blocks highlighted), and the step's parts list.
+Layout (modelled on the reference booklets in ./references/):
+  - a cover page with the finished model;
+  - step pages laid out as a grid of cells, each cell = a boxed step number, a parts list
+    of little iso block icons with x-counts, and the build-so-far diagram (new blocks
+    hovering on drop-lines above pale already-built blocks);
+  - a "Finished!" page with the full model.
 
-This is a FIRST-PASS layout. The look — page design, cover, typography, iso style — is
-meant to be redesigned against the reference booklets in ./references/.
+Still iterating on the exact look — easy knobs are grouped at the top.
 """
 
 from __future__ import annotations
@@ -18,93 +21,142 @@ import argparse
 import sys
 from pathlib import Path
 
-# Works both as `python -m manual.generate` (relative) and `python manual/generate.py`
-# (the script's own dir is on sys.path, so the plain imports resolve).
 try:
     from . import buildplan, iso
 except ImportError:
     import buildplan, iso
 
 
+# --- Layout knobs ----------------------------------------------------------------
+COLS, ROWS = 2, 2          # step cells per page
+MARGIN = 40.0              # page margin
+GUTTER = 14.0             # gap between cells
+INK = (0.12, 0.12, 0.12)
+GREY = (0.5, 0.5, 0.5)
+HAIRLINE = (0.8, 0.8, 0.8)
+
+
 def _require_reportlab():
     try:
         import reportlab  # noqa: F401
     except ImportError:
-        sys.exit(
-            "This needs ReportLab. Install it with:\n"
-            "    pip install -r manual/requirements.txt\n"
-            "(or: pip install reportlab)"
-        )
-
-
-# --- First-pass page layout knobs (TODO: redesign against references) -------------
-PAGE_MARGIN = 48.0
-HEADER_GAP = 28.0
+        sys.exit("This needs ReportLab:\n    pip install -r manual/requirements.txt")
 
 
 def render(plan, out_path: Path) -> int:
     from reportlab.lib.colors import Color
-    from reportlab.lib.pagesizes import A5
+    from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen import canvas as rl_canvas
 
-    page_w, page_h = A5
-    c = rl_canvas.Canvas(str(out_path), pagesize=A5)
+    page_w, page_h = A4
+    c = rl_canvas.Canvas(str(out_path), pagesize=A4)
 
-    pages = 0
-    for step in buildplan.iter_steps(plan):
-        _draw_page(c, plan, step, page_w, page_h, Color)
-        c.showPage()
-        pages += 1
+    steps = list(buildplan.iter_steps(plan))
+    final = steps[-1].cumulative if steps else []
 
-    if pages == 0:
-        # An empty plan still produces a valid (empty) PDF rather than crashing.
+    _cover(c, plan, final, page_w, page_h, Color)
+    c.showPage()
+
+    per_page = COLS * ROWS
+    for i in range(0, len(steps), per_page):
+        _step_page(c, plan, steps[i:i + per_page], page_w, page_h, Color)
         c.showPage()
+
+    _finished(c, plan, final, page_w, page_h, Color)
+    c.showPage()
+
     c.save()
-    return pages
+    return len(steps)
 
 
-def _draw_page(c, plan, step, page_w, page_h, Color):
-    # --- Header ---------------------------------------------------------------
-    c.setFillColor(Color(0.1, 0.1, 0.1))
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(PAGE_MARGIN, page_h - PAGE_MARGIN, plan.name)
+# --- Pages -----------------------------------------------------------------------
 
-    c.setFont("Helvetica", 10)
-    c.setFillColor(Color(0.45, 0.45, 0.45))
-    c.drawString(PAGE_MARGIN, page_h - PAGE_MARGIN - 16,
-                 f"Bag {step.bag_index + 1}: {step.bag_name}")
-    c.drawRightString(page_w - PAGE_MARGIN, page_h - PAGE_MARGIN,
-                      f"Step {step.step_global} / {step.total_steps}")
+def _cover(c, plan, final, page_w, page_h, Color):
+    c.setFillColor(Color(*INK))
+    c.setFont("Helvetica-Bold", 30)
+    c.drawCentredString(page_w / 2, page_h - 120, plan.name)
+    c.setFillColor(Color(*GREY))
+    c.setFont("Helvetica", 13)
+    c.drawCentredString(page_w / 2, page_h - 145, "SnapBlock build manual")
 
-    # --- Diagram --------------------------------------------------------------
-    # Centre the cumulative diagram in the area between header and parts list.
-    area_top = page_h - PAGE_MARGIN - HEADER_GAP - 16
-    area_bottom = PAGE_MARGIN + 90  # leave room for the parts list
-    area_cx = page_w / 2.0
+    iso.draw_diagram(c, (MARGIN, 150, page_w - MARGIN, page_h - 220), final, set(), plan.palette)
 
-    min_x, min_y, max_x, max_y = iso.diagram_bounds(step.cumulative)
-    diag_cx = (min_x + max_x) / 2.0
-    # In y-down math space, the page origin maps so the diagram centres in the area.
-    ox = area_cx - diag_cx
-    oy = (area_top + area_bottom) / 2.0 + (min_y + max_y) / 2.0
+    c.setFillColor(Color(*GREY))
+    c.setFont("Helvetica", 9)
+    total = len(final)
+    c.drawCentredString(page_w / 2, 110, f"{total} blocks  -  build it bottom-up, follow the steps")
 
-    new_cells = {b.cell for b in step.new}
-    for b in iso.painter_order(step.cumulative):
-        rgb = plan.palette[b.material]
-        iso.draw_block(c, b, rgb, (ox, oy), highlight=b.cell in new_cells)
 
-    # --- Parts list -----------------------------------------------------------
-    c.setFillColor(Color(0.1, 0.1, 0.1))
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(PAGE_MARGIN, PAGE_MARGIN + 60, "This step:")
+def _finished(c, plan, final, page_w, page_h, Color):
+    iso.draw_diagram(c, (MARGIN, 150, page_w - MARGIN, page_h - 200), final, set(), plan.palette)
+    c.setFillColor(Color(*INK))
+    c.setFont("Helvetica-Bold", 26)
+    c.drawCentredString(page_w / 2, page_h - 130, "Finished!")
+    c.setFillColor(Color(*GREY))
+    c.setFont("Helvetica-Oblique", 10)
+    c.drawCentredString(page_w / 2, 120, "A few spare blocks are normal.")
 
-    c.setFont("Helvetica", 10)
-    c.setFillColor(Color(0.2, 0.2, 0.2))
-    if step.parts:
-        line = "    ".join(f"{p.count}x  {p.material} {p.type}" for p in step.parts)
-    else:
-        line = "(nothing — placeholder step)"
-    c.drawString(PAGE_MARGIN, PAGE_MARGIN + 44, line)
+
+def _step_page(c, plan, steps, page_w, page_h, Color):
+    grid_w = page_w - 2 * MARGIN
+    grid_h = page_h - 2 * MARGIN
+    cell_w = (grid_w - (COLS - 1) * GUTTER) / COLS
+    cell_h = (grid_h - (ROWS - 1) * GUTTER) / ROWS
+
+    for idx, step in enumerate(steps):
+        col = idx % COLS
+        row = idx // COLS
+        x0 = MARGIN + col * (cell_w + GUTTER)
+        # rows fill top-to-bottom
+        y1 = page_h - MARGIN - row * (cell_h + GUTTER)
+        y0 = y1 - cell_h
+        _step_cell(c, plan, step, (x0, y0, x0 + cell_w, y1), Color)
+
+
+def _step_cell(c, plan, step, rect, Color):
+    x0, y0, x1, y1 = rect
+
+    # cell separator (hairline)
+    c.setStrokeColor(Color(*HAIRLINE))
+    c.setLineWidth(0.6)
+    c.rect(x0, y0, x1 - x0, y1 - y0, stroke=1, fill=0)
+
+    pad = 8.0
+    # boxed step number, top-left
+    n = str(step.step_global)
+    c.setFillColor(Color(*INK))
+    c.setLineWidth(1.0)
+    c.setStrokeColor(Color(*INK))
+    box = 16.0
+    bx, by = x0 + pad, y1 - pad - box
+    c.rect(bx, by, box, box, stroke=1, fill=0)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawCentredString(bx + box / 2, by + box / 2 - 3.5, n)
+
+    # bag label, next to the number
+    c.setFillColor(Color(*GREY))
+    c.setFont("Helvetica", 8)
+    c.drawString(bx + box + 6, by + box / 2 - 3, step.bag_name)
+
+    # parts list: a horizontal row under the header (icon + xN per distinct piece).
+    parts_y = by - 12
+    px = x0 + pad + 4
+    icon_size = 0.36
+    for part in step.parts:
+        rgb = plan.palette[part.material]
+        iw = iso.icon_width(part.width, part.depth, icon_size)
+        iso.draw_part_icon(c, (px + iw / 2, parts_y), part.width, part.depth,
+                           part.finish, rgb, icon_size)
+        c.setFillColor(Color(*INK))
+        c.setFont("Helvetica", 8)
+        label = f"x{part.count}"
+        tx = px + iw + 3
+        c.drawString(tx, parts_y - 3, label)
+        px = tx + c.stringWidth(label, "Helvetica", 8) + 12
+
+    # diagram fills the rest of the cell, below the parts row
+    diag = (x0 + pad, y0 + pad, x1 - pad, parts_y - 16)
+    iso.draw_diagram(c, diag, step.cumulative, {b.cell for b in step.new}, plan.palette)
 
 
 def main(argv=None):
@@ -120,7 +172,7 @@ def main(argv=None):
 
     plan = buildplan.load_plan(plan_path)
     pages = render(plan, out_path)
-    print(f"Wrote {out_path}  ({pages} page{'s' if pages != 1 else ''}, '{plan.name}')")
+    print(f"Wrote {out_path}  ({pages} steps, '{plan.name}')")
 
 
 if __name__ == "__main__":

@@ -1,9 +1,12 @@
 """
 Load and walk a build-plan (see ../docs/build_plan.md).
 
-Pure standard library — no Blender, no drawing deps. This module is the shared
-understanding of the format: load it, validate it lightly, and iterate it as a
-sequence of per-step "views" the renderer can draw one page from.
+Pure standard library + the local catalogue — no Blender, no drawing deps. This module
+is the shared understanding of the format: load it, validate it lightly, and iterate it
+as a sequence of per-step "views" the renderer can draw one page from.
+
+Blocks may be rectangular (W x D x 1) and carry a finish (studded / smooth) plus the
+exact set of cells that show a stud.
 """
 
 from __future__ import annotations
@@ -13,39 +16,56 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import catalogue
+
 
 @dataclass(frozen=True)
 class Block:
     x: int
     y: int
     z: int
-    type: str
-    material: str
+    width: int = 1
+    depth: int = 1
+    type: str = "1x1"            # as-placed "WxD"
+    material: str = ""
+    finish: str = "stud"          # "stud" | "smooth"
+    studs: tuple = ()             # global (cx, cy) cells that show a stud
 
     @property
-    def cell(self) -> tuple[int, int, int]:
+    def cell(self):
         return (self.x, self.y, self.z)
+
+    @property
+    def footprint(self):
+        return [(self.x + i, self.y + j) for i in range(self.width) for j in range(self.depth)]
+
+    @property
+    def catalogue_id(self):
+        """Orientation-independent library id (1x4 and 4x1 share '4x1')."""
+        return catalogue.normalize_id(self.width, self.depth)
 
 
 @dataclass
 class Part:
-    """A line in a step's parts list: how many of one (material, type)."""
+    """A line in a step's parts list: how many of one (catalogue_id, material, finish)."""
     count: int
+    type: str          # catalogue id, e.g. "4x1"
+    width: int
+    depth: int
     material: str
-    type: str
+    finish: str
 
 
 @dataclass
 class StepView:
-    """Everything the renderer needs to draw one page."""
     bag_index: int
     bag_name: str
-    step_in_bag: int          # 1-based within the bag
-    step_global: int          # 1-based across the whole plan
+    step_in_bag: int
+    step_global: int
     total_steps: int
-    cumulative: list[Block]   # all blocks placed up to AND including this step
-    new: list[Block]          # the blocks added in this step (highlight these)
-    parts: list[Part]         # derived from `new`
+    cumulative: list
+    new: list
+    parts: list
 
 
 @dataclass
@@ -53,25 +73,46 @@ class Plan:
     name: str
     grid_u: float
     grid_h: float
-    palette: dict[str, tuple[float, float, float]]
-    bags: list[dict] = field(default_factory=list)
+    palette: dict
+    bags: list = field(default_factory=list)
 
 
 class PlanError(ValueError):
     """A build plan that doesn't conform to the format."""
 
 
-def load_plan(path: str | Path) -> Plan:
-    """Read and lightly validate a build-plan JSON file."""
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
+def _block_from_dict(b: dict) -> Block:
+    type_id = b.get("type", "1x1")
+    try:
+        w, d = catalogue.parse_dims(type_id)
+    except ValueError:
+        raise PlanError(f"block has non-rectangular type {type_id!r}; only WxD supported")
+    cx, cy, cz = b["cell"]
+    finish = b.get("finish", "stud")
 
-    version = data.get("version")
-    if version != 1:
-        raise PlanError(f"unsupported build-plan version: {version!r} (this tool reads 1)")
+    foot = [(cx + i, cy + j) for i in range(w) for j in range(d)]
+    if "studs" in b:
+        studs = tuple((int(s[0]), int(s[1])) for s in b["studs"])
+    elif finish == "stud":
+        # No occupancy info at load time, so default to the whole top; painter order
+        # hides studs that end up under another block. The planner sets this exactly.
+        studs = tuple(foot)
+    else:
+        studs = ()
 
-    palette_raw = data.get("palette") or {}
-    palette = {name: tuple(rgb) for name, rgb in palette_raw.items()}
+    return Block(x=cx, y=cy, z=cz, width=w, depth=d, type=type_id,
+                 material=b["material"], finish=finish, studs=studs)
 
+
+def load_plan(path) -> Plan:
+    return plan_from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
+def plan_from_dict(data: dict) -> Plan:
+    if data.get("version") != 1:
+        raise PlanError(f"unsupported build-plan version: {data.get('version')!r} (this tool reads 1)")
+
+    palette = {name: tuple(rgb) for name, rgb in (data.get("palette") or {}).items()}
     plan = Plan(
         name=(data.get("model") or {}).get("name", "Untitled"),
         grid_u=(data.get("grid") or {}).get("U", 1.0),
@@ -84,50 +125,35 @@ def load_plan(path: str | Path) -> Plan:
     for bag in plan.bags:
         for step in bag.get("steps", []):
             for b in step.get("add", []):
-                mat = b.get("material")
-                if mat not in palette:
+                if b.get("material") not in palette:
                     raise PlanError(
-                        f"block at cell {b.get('cell')} uses material {mat!r}, "
-                        f"which isn't in the palette"
-                    )
+                        f"block at cell {b.get('cell')} uses material "
+                        f"{b.get('material')!r}, which isn't in the palette")
     return plan
 
 
-def _parts(blocks: list[Block]) -> list[Part]:
-    """Count blocks by (material, type) for a step's parts list."""
-    counts = Counter((b.material, b.type) for b in blocks)
-    # Stable, readable order: by material then type.
-    return [Part(count=n, material=m, type=t)
-            for (m, t), n in sorted(counts.items())]
+def _parts(blocks) -> list:
+    counts = Counter((b.catalogue_id, b.material, b.finish) for b in blocks)
+    dims = {b.catalogue_id: (max(b.width, b.depth), min(b.width, b.depth)) for b in blocks}
+    out = []
+    for (cid, mat, finish), n in sorted(counts.items()):
+        w, d = dims[cid]
+        out.append(Part(count=n, type=cid, width=w, depth=d, material=mat, finish=finish))
+    return out
 
 
 def iter_steps(plan: Plan):
-    """Yield a StepView per step, accumulating the build as we go.
-
-    The plan stores only per-step deltas (`add`); the manual wants the cumulative
-    picture with the new blocks highlighted, so we build that here once.
-    """
     total = sum(len(bag.get("steps", [])) for bag in plan.bags)
-
-    cumulative: list[Block] = []
+    cumulative = []
     step_global = 0
     for bag_index, bag in enumerate(plan.bags):
         bag_name = bag.get("name", f"Bag {bag_index + 1}")
         for step_in_bag, step in enumerate(bag.get("steps", []), start=1):
             step_global += 1
-            new = [
-                Block(x=c[0], y=c[1], z=c[2], type=b.get("type", "1x1"), material=b["material"])
-                for b in step.get("add", [])
-                for c in [b["cell"]]
-            ]
+            new = [_block_from_dict(b) for b in step.get("add", [])]
             cumulative = cumulative + new
             yield StepView(
-                bag_index=bag_index,
-                bag_name=bag_name,
-                step_in_bag=step_in_bag,
-                step_global=step_global,
-                total_steps=total,
-                cumulative=list(cumulative),
-                new=new,
-                parts=_parts(new),
+                bag_index=bag_index, bag_name=bag_name,
+                step_in_bag=step_in_bag, step_global=step_global, total_steps=total,
+                cumulative=list(cumulative), new=new, parts=_parts(new),
             )

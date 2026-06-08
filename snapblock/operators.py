@@ -92,6 +92,160 @@ class SNAPBLOCK_OT_add_block(bpy.types.Operator):
         return {'FINISHED'}
 
 
+def _whole_cells(value, cell_size):
+    """If `value` is a whole number of cells (within GRID_SNAP_TOL), return that
+    integer count; otherwise return None. Used to check a captured block's footprint
+    snaps to the grid before we accept it."""
+    cells = value / cell_size
+    nearest = round(cells)
+    if nearest >= 1 and abs(cells - nearest) <= constants.GRID_SNAP_TOL:
+        return nearest
+    return None
+
+
+class SNAPBLOCK_OT_add_block_from_selection(bpy.types.Operator):
+    """Capture the active object as a new block in your library, so it shows up as a
+    button in every file. SnapBlock makes a clean copy: it bakes in the object's
+    rotation/scale, moves the origin to the bottom corner, and drops its materials —
+    your original object is left untouched. The footprint must be a whole number of
+    cells so the block snaps to the grid."""
+    bl_idname = "snapblock.add_block_from_selection"
+    bl_label = "Add block from selection"
+    bl_description = "Capture the active object as a custom block in your library"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    name: bpy.props.StringProperty(name="Block name", default="")
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and obj.type == 'MESH'
+
+    def invoke(self, context, event):
+        # Default the name to the active object's name (only if the user hasn't typed
+        # one yet), then pop the dialog so they can rename before it's captured.
+        if not self.name and context.active_object is not None:
+            self.name = context.active_object.name
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        target = context.active_object
+        if target is None or target.type != 'MESH':
+            self.report({'ERROR'}, "Select a mesh object to capture as a block.")
+            return {'CANCELLED'}
+
+        name = self.name.strip()
+        if not name:
+            self.report({'ERROR'}, "Give the block a name first.")
+            return {'CANCELLED'}
+
+        type_id = prefs.slug(name)
+        if not type_id:
+            self.report({'ERROR'},
+                        "That name has no letters or numbers I can use — try a plain "
+                        "name like 'My Wedge'.")
+            return {'CANCELLED'}
+
+        # Need somewhere to record the block; bail early (before any geometry work) if
+        # the add-on isn't enabled.
+        prefs_block = prefs.addon_prefs(context)
+        if prefs_block is None:
+            self.report({'ERROR'}, prefs.BLOCKS_DISABLED_MSG)
+            return {'CANCELLED'}
+
+        if prefs.block_name_exists(context, type_id):
+            self.report({'ERROR'},
+                        "A block called '{}' already exists — pick another name."
+                        .format(name))
+            return {'CANCELLED'}
+
+        # Work on a COPY of the mesh so the user's object is never touched. bpy note:
+        # data.copy() copies the base mesh (modifiers are NOT applied — apply them
+        # first if you want them baked in).
+        mesh = target.data.copy()
+        # Bake the object's full world transform (location + rotation + scale) into the
+        # vertices — this captures the block as you see it and "applies" scale/rotation
+        # in one step. mesh.transform multiplies every vertex by the matrix.
+        mesh.transform(target.matrix_world)
+        # Colors are applied at runtime, like every built-in block — drop any materials.
+        mesh.materials.clear()
+
+        # Re-origin to the bottom -X/-Y corner (same convention as every built-in block),
+        # so a placed block fills whole cells from its origin.
+        min_x, min_y, min_z = library.footprint_min(mesh)
+        mesh.transform(Matrix.Translation((-min_x, -min_y, -min_z)))
+
+        # Refuse an off-grid footprint rather than silently rounding it (per the chosen
+        # validation rule). Only X/Y are checked: a block legitimately stands a little
+        # over 1.0 tall because studs add height (see constants.H).
+        dx, dy, _dz = library.footprint_dims(mesh)
+        cells_x = _whole_cells(dx, constants.U)
+        cells_y = _whole_cells(dy, constants.U)
+        if cells_x is None or cells_y is None:
+            # Clean up the throwaway mesh copy before bailing.
+            bpy.data.meshes.remove(mesh)
+            self.report({'ERROR'},
+                        "This block's footprint is {:.2f} × {:.2f} cells — each side "
+                        "needs to be a whole number of cells so it snaps to the grid. "
+                        "Resize it and try again."
+                        .format(dx / constants.U, dy / constants.U))
+            return {'CANCELLED'}
+
+        # Wrap the clean mesh in an object and write it to its own .blend. The object is
+        # never linked to a collection, so it stays out of the user's scene entirely.
+        obj = bpy.data.objects.new(type_id, mesh)
+        library.write_custom_block(obj, type_id)
+
+        # Tidy the temp datablocks out of this session so the live file is unchanged.
+        bpy.data.objects.remove(obj, do_unlink=True)
+        bpy.data.meshes.remove(mesh)
+
+        # Record the pointer in prefs and persist, so the block is a button next session.
+        item = prefs_block.custom_blocks.add()
+        item.name = name
+        item.type_id = type_id
+        bpy.ops.wm.save_userpref()
+
+        self.report({'INFO'},
+                    "Added block '{}' ({}×{} cells) — it's now a button in the Blocks "
+                    "panel. Studs and height are up to you; SnapBlock only checks the "
+                    "footprint.".format(name, cells_x, cells_y))
+        return {'FINISHED'}
+
+
+class SNAPBLOCK_OT_remove_block(bpy.types.Operator):
+    """Remove one of your custom blocks from the library, deleting its stored .blend.
+    The built-in blocks can't be removed. Blocks you already placed in the scene stay
+    — they're normal mesh objects."""
+    bl_idname = "snapblock.remove_block"
+    bl_label = "Remove block"
+    bl_description = "Remove this custom block from your library"
+    bl_options = {'REGISTER'}   # preferences aren't part of Blender's undo stack
+
+    type_id: bpy.props.StringProperty()
+
+    def execute(self, context):
+        prefs_block = prefs.addon_prefs(context)
+        if prefs_block is None:
+            self.report({'ERROR'}, prefs.BLOCKS_DISABLED_MSG)
+            return {'CANCELLED'}
+
+        coll = prefs_block.custom_blocks
+        # CollectionProperty removes by index, not by id, so find the index first.
+        index = next((i for i, it in enumerate(coll) if it.type_id == self.type_id), -1)
+        if index < 0:
+            self.report({'ERROR'}, "No custom block called '{}'.".format(self.type_id))
+            return {'CANCELLED'}
+
+        label = coll[index].name
+        coll.remove(index)
+        # Drop the geometry file too, so removal is complete (tolerates a missing file).
+        library.delete_custom_block(self.type_id)
+        bpy.ops.wm.save_userpref()
+        self.report({'INFO'}, "Removed block '{}'.".format(label))
+        return {'FINISHED'}
+
+
 def _get_or_create_material(name, rgb, roughness, opacity, transmission):
     """Return the shared 'SnapBlock_<name>' material, creating it once if needed.
     One material per name, reused across every block that uses it.
@@ -234,7 +388,12 @@ class SNAPBLOCK_OT_add_material(bpy.types.Operator):
         # The finish preset fully determines the look (no fine-tune sliders).
         roughness, opacity, transmission = _FINISH_LOOKUP[self.finish]
 
-        item = prefs.addon_prefs(context).custom_materials.add()
+        prefs_block = prefs.addon_prefs(context)
+        if prefs_block is None:
+            self.report({'ERROR'}, prefs.PREFS_DISABLED_MSG)
+            return {'CANCELLED'}
+
+        item = prefs_block.custom_materials.add()
         item.name = name
         item.color = self.color
         item.roughness = roughness
@@ -266,7 +425,11 @@ class SNAPBLOCK_OT_remove_material(bpy.types.Operator):
     name: bpy.props.StringProperty()
 
     def execute(self, context):
-        coll = prefs.addon_prefs(context).custom_materials
+        prefs_block = prefs.addon_prefs(context)
+        if prefs_block is None:
+            self.report({'ERROR'}, prefs.PREFS_DISABLED_MSG)
+            return {'CANCELLED'}
+        coll = prefs_block.custom_materials
         # CollectionProperty removes by index, not by name, so find the index first.
         index = next((i for i, it in enumerate(coll) if it.name == self.name), -1)
         if index < 0:
@@ -354,7 +517,12 @@ class SNAPBLOCK_OT_add_material_from_existing(bpy.types.Operator):
                         .format(name))
             return {'CANCELLED'}
 
-        item = prefs.addon_prefs(context).custom_materials.add()
+        prefs_block = prefs.addon_prefs(context)
+        if prefs_block is None:
+            self.report({'ERROR'}, prefs.PREFS_DISABLED_MSG)
+            return {'CANCELLED'}
+
+        item = prefs_block.custom_materials.add()
         item.name = name
         item.color = rgb
         item.roughness = roughness
@@ -520,6 +688,8 @@ class SNAPBLOCK_OT_delete(bpy.types.Operator):
 # which is why operators register before panels.
 classes = (
     SNAPBLOCK_OT_add_block,
+    SNAPBLOCK_OT_add_block_from_selection,
+    SNAPBLOCK_OT_remove_block,
     SNAPBLOCK_OT_apply_material,
     SNAPBLOCK_OT_add_material,
     SNAPBLOCK_OT_add_material_from_existing,

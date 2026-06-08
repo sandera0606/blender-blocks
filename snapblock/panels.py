@@ -41,13 +41,31 @@ class SNAPBLOCK_PT_blocks(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
 
-        # grid_flow lays buttons out in a tidy, auto-wrapping grid.
+        # prefs.iter_blocks yields the built-in catalogue followed by the user's custom
+        # blocks — one source of truth, so captured blocks appear here for free.
         grid = layout.grid_flow(row_major=True, columns=2, even_columns=True)
-        for type_id, label in constants.BLOCK_TYPES:
+        for type_id, label in prefs.iter_blocks(context):
             # Each button calls the same operator with a different type_id — the
             # operator-per-action split, parameterised by which block to add.
             op = grid.operator("snapblock.add_block", text=label)
             op.type_id = type_id
+
+        layout.separator()
+        layout.operator("snapblock.add_block_from_selection",
+                        text="Add block from selection…", icon='ADD')
+
+        # Removal lives here too, so it's reachable without digging into Add-on prefs.
+        # Only custom blocks are listed (the built-ins can't be removed).
+        prefs_block = prefs.addon_prefs(context)
+        customs = list(prefs_block.custom_blocks) if prefs_block is not None else []
+        if customs:
+            col = layout.column(align=True)
+            col.label(text="Remove a custom block:")
+            for item in customs:
+                row = col.row(align=True)
+                row.label(text=item.name, icon='MESH_CUBE')
+                op = row.operator("snapblock.remove_block", text="", icon='X')
+                op.type_id = item.type_id
 
 
 class SNAPBLOCK_PT_colors(bpy.types.Panel):
@@ -75,6 +93,19 @@ class SNAPBLOCK_PT_colors(bpy.types.Panel):
         col.operator("snapblock.add_material", text="Add material…", icon='ADD')
         col.operator("snapblock.add_material_from_existing",
                      text="Add from material…", icon='MATERIAL')
+
+        # Removal lives here too, so it's reachable without digging into Add-on prefs.
+        # Only custom materials are listed (the built-in presets can't be removed).
+        prefs_block = prefs.addon_prefs(context)
+        customs = list(prefs_block.custom_materials) if prefs_block is not None else []
+        if customs:
+            col = layout.column(align=True)
+            col.label(text="Remove a custom material:")
+            for item in customs:
+                row = col.row(align=True)
+                row.label(text=item.name, icon='MATERIAL')
+                op = row.operator("snapblock.remove_material", text="", icon='X')
+                op.name = item.name
 
 
 class SNAPBLOCK_PT_move(bpy.types.Panel):
