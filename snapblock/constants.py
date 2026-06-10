@@ -29,6 +29,18 @@ LIBRARY_FILENAME = "snapblock_library.blend"   # bundled block library
 # Blender's per-user CONFIG dir (resolved via bpy.utils.user_resource in prefs.py).
 CUSTOM_BLOCKS_DIRNAME = "snapblock/custom_blocks"
 
+# --- Follow-a-manual driver ------------------------------------------------
+# Each "bag" in a build plan becomes a collection nested under BUILD_COLLECTION.
+# Data-block names are file-global, so bag names are namespaced with this prefix
+# to avoid colliding with unrelated collections.
+BAG_COLLECTION_PREFIX = "SnapBlock: "
+# The ghost hint's throwaway collection + its translucent material. Cleared whenever
+# the hint is toggled off or the step changes — it's a hint, not part of the build.
+GHOST_COLLECTION = "SnapBlock Ghost (hint)"
+GHOST_MATERIAL = "Ghost"
+GHOST_COLOR = (0.55, 0.6, 0.7)   # cool grey, clearly "not a real block"
+GHOST_OPACITY = 0.25             # translucent so the real build reads through it
+
 # --- Block catalogue -------------------------------------------------------
 # The BUILT-IN block types. (type_id, display_label). type_id must match an object
 # name in the bundled library .blend; placed blocks are named "Block_<type_id>.NNN".

@@ -24,12 +24,17 @@ def main(argv=None):
     parser.add_argument("-o", "--out", help="output PDF (default: <voxel>_manual.pdf)")
     parser.add_argument("--overrides", help="optional sidecar JSON of colour renames / finishes")
     parser.add_argument("--plan-out", help="also write the intermediate build-plan JSON here")
+    parser.add_argument("--allow-floating", action="store_true",
+                        help="warn instead of failing when a piece rests on nothing")
     args = parser.parse_args(argv)
 
     generate._require_reportlab()
 
     voxel = vox_import.load_voxel(args.voxel, args.overrides)
-    build_plan = planner.plan(voxel)
+    try:
+        build_plan = planner.plan(voxel, allow_floating=args.allow_floating)
+    except planner.UnsupportedBuildError as e:
+        raise SystemExit(f"Can't build this model:\n{e}")
 
     if args.plan_out:
         Path(args.plan_out).write_text(json.dumps(build_plan, indent=2), encoding="utf-8")

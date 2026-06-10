@@ -5,8 +5,10 @@ Pure standard library + the local catalogue — no Blender, no drawing deps. Thi
 is the shared understanding of the format: load it, validate it lightly, and iterate it
 as a sequence of per-step "views" the renderer can draw one page from.
 
-Blocks may be rectangular (W x D x 1) and carry a finish (studded / smooth) plus the
-exact set of cells that show a stud.
+Blocks may be rectangular (W x D x 1) and carry a finish (studded / smooth). Which of a
+studded block's cells actually *show* a stud is NOT stored — it depends on what's been
+stacked so far, so it's computed per step from cumulative occupancy (see `occupancy` and
+`iso.visible_studs`). A stud is drawn only while its cell's top is still exposed.
 """
 
 from __future__ import annotations
@@ -29,7 +31,6 @@ class Block:
     type: str = "1x1"            # as-placed "WxD"
     material: str = ""
     finish: str = "stud"          # "stud" | "smooth"
-    studs: tuple = ()             # global (cx, cy) cells that show a stud
 
     @property
     def cell(self):
@@ -38,6 +39,12 @@ class Block:
     @property
     def footprint(self):
         return [(self.x + i, self.y + j) for i in range(self.width) for j in range(self.depth)]
+
+    @property
+    def cells(self):
+        """The filled (x, y, z) cells this block occupies (height 1)."""
+        return [(self.x + i, self.y + j, self.z)
+                for i in range(self.width) for j in range(self.depth)]
 
     @property
     def catalogue_id(self):
@@ -89,19 +96,10 @@ def _block_from_dict(b: dict) -> Block:
         raise PlanError(f"block has non-rectangular type {type_id!r}; only WxD supported")
     cx, cy, cz = b["cell"]
     finish = b.get("finish", "stud")
-
-    foot = [(cx + i, cy + j) for i in range(w) for j in range(d)]
-    if "studs" in b:
-        studs = tuple((int(s[0]), int(s[1])) for s in b["studs"])
-    elif finish == "stud":
-        # No occupancy info at load time, so default to the whole top; painter order
-        # hides studs that end up under another block. The planner sets this exactly.
-        studs = tuple(foot)
-    else:
-        studs = ()
-
+    # A legacy "studs" array (old plans) is intentionally ignored: stud visibility is now
+    # derived per step from occupancy, not stored. `finish` is all the renderer needs.
     return Block(x=cx, y=cy, z=cz, width=w, depth=d, type=type_id,
-                 material=b["material"], finish=finish, studs=studs)
+                 material=b["material"], finish=finish)
 
 
 def load_plan(path) -> Plan:
@@ -130,6 +128,17 @@ def plan_from_dict(data: dict) -> Plan:
                         f"block at cell {b.get('cell')} uses material "
                         f"{b.get('material')!r}, which isn't in the palette")
     return plan
+
+
+def occupancy(blocks) -> set:
+    """Every filled (x, y, z) cell covered by `blocks` (each block is height 1).
+
+    Stud visibility is read off this: a studded block shows a stud on (cx, cy, z) iff
+    (cx, cy, z+1) is not in the occupancy at that step (nothing stacked on it yet)."""
+    occ = set()
+    for b in blocks:
+        occ.update(b.cells)
+    return occ
 
 
 def _parts(blocks) -> list:

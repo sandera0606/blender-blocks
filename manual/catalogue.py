@@ -31,9 +31,12 @@ RECT_BLOCKS = {
     "20x20": (20, 20),
 }
 
-# Cap for the "varied / capped" merge vibe: drop the big 10x / 20x slabs so a build
-# reads as many satisfying pieces rather than a few giant plates.
-MERGE_MAX_DIM = 8
+# The largest footprint the catalogue offers, by long side (DERIVED, not hardcoded):
+# the absolute ceiling for any merge. The planner sizes pieces *below* this with a
+# per-region ratio (see planner.MERGE_PIECE_RATIO) so a build reads as many satisfying
+# pieces rather than a few giant plates — while still allowing a big slab where a region
+# is large enough to earn one (e.g. a wide base under a thin top).
+CATALOGUE_MAX_DIM = max(max(W, D) for (W, D) in RECT_BLOCKS.values())
 
 _TYPE_RE = re.compile(r"^(\d+)x(\d+)$")
 
@@ -52,7 +55,7 @@ def normalize_id(w: int, d: int) -> str:
     return f"{max(w, d)}x{min(w, d)}"
 
 
-def merge_candidates(max_dim: int = MERGE_MAX_DIM):
+def merge_candidates(max_dim: int = CATALOGUE_MAX_DIM):
     """Placements (w, d) the merger may use, both orientations, largest-first.
 
     Deterministic order: largest area, then most-square, then wider-in-X. The merger

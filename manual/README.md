@@ -50,11 +50,24 @@ manual/
 1. **Stud vs smooth** per exposed-top cell: a large flat exposed region (≥ `SMOOTH_MIN_REGION`)
    reads as **smooth**; small/bumpy exposed tops stay **studded**; a per-material override
    (`overrides` in the voxel model, or a `.vox` sidecar) forces either. Covered tops never
-   get studs.
-2. **Merge** cells into rectangles (capped greedy, per layer, per material+finish), with
-   **staggered seams** between layers (scan direction alternates by layer parity).
+   get studs. The **foundation (lowest) layer never auto-smooths** — a studless base cell
+   has nothing above *or* below to anchor it, so it would merge into loose pieces; keeping
+   the base studded makes it a solid, connected foundation (an override can still force it).
+2. **Merge** cells into rectangles (greedy, per layer, per material+finish), with
+   **staggered seams** between layers (scan direction alternates by layer parity). Piece
+   size is a **ratio of the region**, not a flat cap: a piece spans at most
+   `MERGE_PIECE_RATIO` of a region's long side (floored at `MERGE_MIN_CAP`, ceilinged at
+   the largest catalogue block), so a region gets roughly a constant *number* of pieces —
+   small details stay small, a wide base earns big slabs instead of being banned outright.
 3. **Order** bottom-up so nothing is placed in mid-air.
-4. **Chunk** into steps (`STEP_MAX` blocks, within a layer) and bags (`BAG_LAYERS` per bag).
+4. **Check** the build is sound: every piece is supported (something directly below, or it's
+   on the `z==0` baseplate) and the whole thing is connected by stud coupling (no loose
+   pieces — see the support/connectivity note below). If the first merge leaves a piece
+   floating or loose, a **connectivity-repair pass** re-merges just the affected groups with
+   the cap lifted to the catalogue ceiling (fewest, biggest pieces), so e.g. a wide base
+   consolidates into one slab the thin top can couple onto. Shapes only an L/T block could
+   save still fall through — the error message says so.
+5. **Chunk** into steps (`STEP_MAX` blocks, within a layer) and bags (`BAG_LAYERS` per bag).
 
 ## Status
 
@@ -62,30 +75,43 @@ manual/
 auto stud/smooth + overrides, staggered seams, steps/bags) → nanoblock-style PDF (cover,
 step grid with hover + drop-lines + per-step parts list, finished page).
 
+## Fixed
+
+1. **Per-step studs (was: studs drawn from the final model).** Stud visibility is now a
+   render-time function of `finish` + cumulative occupancy, not stored in the plan: a
+   studded block shows a stud on a cell while nothing is stacked on it *yet at that step*,
+   so it appears while exposed and vanishes once covered (`iso.visible_studs` /
+   `buildplan.occupancy`). The plan no longer carries a `studs` array; a legacy one is
+   ignored.
+
+2. **Support + connectivity checks.** `planner.py` refuses a build that isn't soundly
+   hand-buildable, listing the offending pieces; pass `--allow-floating` to downgrade to a
+   warning and build anyway.
+   - **Support:** every block above the baseplate (`z>0`) must have a filled cell directly
+     below at least one footprint cell (`z==0` rests on the assumed baseplate). One
+     supporting cell is enough, so overhang/cantilever is fine — the *block* just can't
+     float. (`samples/floating_test.json` trips this.)
+   - **Connectivity:** the whole model must hold together as one piece under stud coupling —
+     each block joins the rest by sitting directly on or directly under another block
+     (transitively: a chain of couplings back to the main assembly is enough). Same-layer
+     neighbours don't couple and there's no assumed baseplate, so the test is "lift the
+     model and it stays in one piece." This catches loose islands a wide flat base used to
+     fragment into — though the foundation rule above now prevents the common case
+     (`mushroom_voxel.json`'s 4×4 ground stays studded, merges into two connected 4×2
+     bricks, and passes).
+
 ## Known issues / notes for next time
 
-1. **Studs must be drawn per-STEP from current exposure, not from the final model.**
-   `planner.py` precomputes each block's `studs` from the *finished* build (cells with
-   nothing above them at the end). So a cell that gets covered in a later step shows **no
-   stud even in the earlier steps where it's still exposed** — the build reads wrong (you
-   place a piece onto an apparently studless spot). Physically the stud is always there
-   (it's what holds the piece above); a manual just stops *drawing* it once hidden.
-   Fix: compute stud visibility in the renderer per step from the cumulative occupancy —
-   a studded block shows a stud on cell `(x,y,z)` iff `(x,y,z+1)` isn't filled *yet at
-   that step*. Smooth tiles still never get studs. Probably move stud computation out of
-   the plan into `generate.py`/`iso.py`; the plan would just carry each block's `finish`.
+Cosmetic polish done (`generate.py` / `iso.py`): a warm but restrained SnapBlock identity
+— soft warm-white paper, the lightly-rounded **Mulish** typeface (bundled in `assets/`,
+falls back to Helvetica), one muted clay-rose accent (header band, step badges, badge),
+an editorial tracked "BUILD MANUAL" / "BAG N" treatment, a tinted parts strip, quiet tag
+pills, sticker cards with soft shadows, a "Finished" badge, and soft ground shadows under
+the hero diagrams so the model sits in space. The whole palette is a handful of constants
+at the top of `generate.py` (`ACCENT`, `PAPER`, `INK`, …) — easy to re-tune.
 
-2. **No support / connectivity check — builds can have loose or floating pieces.**
-   `planner.py` orders bottom-up but never checks that each piece rests on / connects to
-   the rest of the build. `mushroom_voxel.json` is a bad example: the 4×4 cap sits on a
-   2×2 stem (outer ring overhangs into air) and the flat ground tiles are only "held" by
-   a baseplate we don't model (loose). Need some of: a self-supporting sample, an assumed
-   baseplate, and/or a planner check that flags/forbids unsupported cells (every non-floor
-   cell has a filled cell below it, or the whole model is connected).
-
-Cosmetic polish also still open: sub-assembly callouts, a header band (set number /
-difficulty), tighter diagram centering, and true brick-bond (current stagger is a
-per-layer scan-direction heuristic).
+Still open: sub-assembly callouts, a difficulty rating in the band, and true brick-bond
+(current stagger is a per-layer scan-direction heuristic).
 
 The build-plan JSON is the contract shared with the in-Blender toy, which will later read
 the same file to drive the hand-build (current step, optional ghost hint, honor-system

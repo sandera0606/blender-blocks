@@ -1,77 +1,56 @@
-# SnapBlock
+# Blender Blocks
+## hi!!! helloo!!! heyyy :-))
+In high school, I remember excitedly getting home from school, tuning into Alpha Brain Waves on my headphones, opening up Blender 3D, and following NanoBlock manuals with my custom-made LEGO bricks.
 
-SnapBlock is a Blender add-on for building things out of snap-together blocks. You pick
-a block from the sidebar, it drops onto a grid, and you snap more next to it and color
-them in. Every block you place is just a regular Blender object, with a regular
-material, in a regular collection. Nothing is faked or hidden behind the scenes.
+It was so super relaxing, and I miss it!! 
 
-It's a toy I built for myself. I like building with blocks in Blender — it's tedious but
-weirdly therapeutic — and this takes the tedium out of it. Because everything it makes
-is real Blender data, I can keep editing a build by hand whenever I want, and turning
-the add-on off leaves the scene perfectly intact.
+It was so much fun to turn my brain off for a bit and just place blocks on top of each other until the build took shape! And I looooved to play around with materials and colours and with the final render (because Blender does such a beautiful job of making everything look SO REAL).
 
-## What works right now
+Here are some things I built (with Nanoblock's manuals !!):
 
-- Placing blocks. Pick one from the sidebar, it lands on the grid, snapped and selected.
-- Coloring. Click a swatch, it applies a material (`SnapBlock_Red`, and so on) and reuses
-  it across blocks of the same color.
-- Moving. The Move panel buttons shift the selection one whole grid cell at a time so
-  things stay lined up.
-- Rotating and deleting. Turn the selection 90° in place (staying on the grid), or remove
-  it (Ctrl+Z brings it back).
+[![psyduck, built with Commotion add on](https://shuang.vercel.app/images/art/lego/psyduck.webp)](https://shuang.vercel.app/images/art/lego/psyduck.mp4)
+![bonsai](https://shuang.vercel.app/images/art/lego/bonsai.webp)
+![totodile](https://shuang.vercel.app/images/art/lego/totodile.webp)
 
-It all runs in Blender. Still on the list: rebuild the block library at the current grid
-scale and double-check block orientation.
+Wow. Just look at that beautiful, crisp Cycles rendering.
 
-## Notes on the code
+Most parts I missed, but some parts really sucked... I had to copy paste blocks every time, and keeping track of where my template, copy-able block was, unhiding it so I could copy it, and then pasting it again was super tedious.
 
-A few things I'd point at:
+Back then, I wanted to build a Blender add-on for basic block summoning and material setting, but I didn't get very far. But now, here it is!!! Mainly this is to make a childhood dream come true... and now I can also get back into the hours of Alpha Brain Waves and brick building that I used to do.
 
-- Everything is real Blender data. No custom data blocks, no hidden state. The scene
-  survives without the add-on, which is the entire point.
-- Positions are integers. A block's position is stored as a whole grid cell and only
-  turned into world coordinates when it's placed. Origins sit at the block's corner, not
-  its center. Otherwise odd-width and even-width blocks land on slightly different grids
-  and stop lining up.
-- One operator per action. Add, color, nudge, rotate, and delete are separate operators
-  instead of one big one that branches.
-- No tracebacks reach the user. A missing file or an empty selection gives a plain
-  message.
-- bpy shifts between versions. One material input got renamed in Blender 4.x, so the code
-  checks for it instead of assuming it's there.
+## Features
+- grid snapping!!
+- on-demand default block summoning!!!
+- if a block is misisng, I can make it myself and add it to the library :D
+- easy material assignment!! wahoo
+- voxel import -> blender block manual (yippee!! Now I do not have to rely on Nanoblock!! Haven't tried it yet though.)
+  - "Why would I want to build something in MagicaVoxel and then again in Blender? That is so pointless." Well, I like it, so whatever...
 
+## Download
+1. Download [snablock.zip](snapblock.zip) and [Blender](https://www.blender.org/download/) (have not tested this on anything other than Blender 4.5, but should work on Blender 4.2+)
+2. In Blender, go to Edit>Preferences>Add-ons
+3. Click the chevron in the top right coner, and click Install from Disk
+
+![Install from disk](docs/install-from-disk.png)
+
+4. Find the zip file in your filepath and click it!
+5. Make sure the check is ticked next to it in the add-ons library, then close out of the window.
+
+Now you will find it in your add on menu (right side of the default viewport)!
+
+## How to use? The basics
+- click on the preset block shapes in the add on to summon them
+- move blocks around with g -> move mouse around OR the 'move' tool in Blender's left side bar & drag arrows
+- select a colour under the add on's materials tab to change the colour of a brick
+
+## Code
 Written in Python against Blender's API (`bpy`), for Blender 4.2+.
 
-## The dev bridge
+Great thanks to Claude Code for helping my dream come to life... here are some cool things that it did along the way
+- some cool math on my pre-made bricks to normalize all origin points, scales, and rotations
+- built on some code I wrote waay back when I first attempted this project
+- custom MCP server add on just for testing the add on's changes :0 (less work for me.. hooray)
+- help with custom Nanoblock-style manuals on voxel import !!! so cool !!!!
 
-`bpy` only exists inside Blender, so testing add-on code usually means pasting a script
-into Blender's scripting tab, running it, and copying the output back. I got tired of
-that and wrote a bridge.
-
-It's a socket server running inside Blender. Send it Python, get the result back. The
-catch is `bpy` isn't thread-safe, so it can't run on the socket thread. Requests go on a
-queue and run on Blender's main thread through a timer, then the result gets passed back.
-It's also wired up as an MCP server so an AI assistant can drive it while I work. Dev
-tool only, not shipped. See `dev/README.md`.
-
-## What's next
-
-Placing, coloring, moving, rotating, and deleting are all written and running. Left to
-do:
-
-- Rebuild the block library at the current scale (one grid cell = one Blender unit).
-- Check block orientation.
-
-Not packaged for download — this is a personal project, so there's no install step.
-
-Things left out on purpose (for now):
-
-- Importing your own blocks
-- Textures
-- Animation
-- Export to other block formats
-
-## Naming
-
-They're "blocks" or "snap blocks," not "LEGO" or "bricks." The shapes are custom anyway,
-not real LEGO proportions — so the name just keeps things consistent.
+## Coming up
+- Maybe I will make my own version of Commotion just for LEGO building so it builds in an order that actually makes sense (sometimes Commotion does not do that)

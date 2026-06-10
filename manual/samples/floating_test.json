@@ -1,0 +1,14 @@
+{
+  "name": "Floating Test (intentionally unbuildable)",
+  "grid": { "U": 1.0, "H": 1.0 },
+  "palette": {
+    "Ground": [0.45, 0.32, 0.20],
+    "Float":  [0.75, 0.12, 0.12]
+  },
+  "cells": [
+    {"cell": [0,0,0], "material": "Ground"}, {"cell": [1,0,0], "material": "Ground"},
+    {"cell": [0,1,0], "material": "Ground"}, {"cell": [1,1,0], "material": "Ground"},
+
+    {"cell": [0,0,2], "material": "Float"}
+  ]
+}

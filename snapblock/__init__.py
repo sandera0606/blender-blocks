@@ -19,13 +19,14 @@ bl_info = {
 
 import bpy
 
-from . import prefs, operators, panels
+from . import prefs, driver, operators, panels
 
 # All classes that need registering, in dependency order: prefs first (the
 # PropertyGroup must exist before the AddonPreferences CollectionProperty that
-# references it, and before operators/panels read it), then operators, then the
+# references it, and before operators/panels read it), then the driver state
+# PropertyGroup (the Scene pointer below references it), then operators, then the
 # panels that reference them. We unregister in reverse.
-classes = (*prefs.classes, *operators.classes, *panels.classes)
+classes = (*prefs.classes, *driver.classes, *operators.classes, *panels.classes)
 
 # Note: there are deliberately no arrow-key shortcuts for the nudge. Blender binds
 # the arrow keys to frame stepping in its default keymap, and an add-on keymap item
@@ -36,9 +37,16 @@ classes = (*prefs.classes, *operators.classes, *panels.classes)
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
+    # Attach the driver state to every Scene. Must come AFTER its PropertyGroup class is
+    # registered (it's in `classes`, registered just above). PointerProperty hangs one
+    # instance off each scene; it's saved in the .blend, so follow-a-manual progress
+    # persists. This is the only scene-level property the add-on adds.
+    bpy.types.Scene.snapblock_driver = bpy.props.PointerProperty(type=driver.SNAPBLOCK_driver_state)
 
 
 def unregister():
+    # Remove the Scene pointer before unregistering its class, mirroring register().
+    del bpy.types.Scene.snapblock_driver
     # Reverse order so nothing is removed while something still depends on it.
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)

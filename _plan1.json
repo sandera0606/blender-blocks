@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "model": {
+    "name": "Little Mushroom"
+  },
+  "grid": {
+    "U": 1.0,
+    "H": 1.0
+  },
+  "palette": {
+    "Ground": [
+      0.45,
+      0.32,
+      0.2
+    ],
+    "Stem": [
+      0.8,
+      0.75,
+      0.6
+    ],
+    "Cap": [
+      0.75,
+      0.12,
+      0.12
+    ]
+  },
+  "bags": [
+    {
+      "name": "Bag 1",
+      "steps": [
+        {
+          "add": [
+            {
+              "cell": [
+                0,
+                0,
+                0
+              ],
+              "type": "4x2",
+              "material": "Ground",
+              "finish": "stud"
+            },
+            {
+              "cell": [
+                0,
+                2,
+                0
+              ],
+              "type": "4x2",
+              "material": "Ground",
+              "finish": "stud"
+            }
+          ]
+        },
+        {
+          "add": [
+            {
+              "cell": [
+                1,
+                1,
+                1
+              ],
+              "type": "2x2",
+              "material": "Stem",
+              "finish": "stud"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bag 2",
+      "steps": [
+        {
+          "add": [
+            {
+              "cell": [
+                1,
+                1,
+                2
+              ],
+              "type": "2x2",
+              "material": "Stem",
+              "finish": "stud"
+            }
+          ]
+        },
+        {
+          "add": [
+            {
+              "cell": [
+                0,
+                0,
+                3
+              ],
+              "type": "4x2",
+              "material": "Cap",
+              "finish": "stud"
+            },
+            {
+              "cell": [
+                0,
+                2,
+                3
+              ],
+              "type": "4x2",
+              "material": "Cap",
+              "finish": "stud"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

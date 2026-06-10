@@ -20,7 +20,7 @@ import math
 import bpy
 from mathutils import Matrix, Vector
 
-from . import constants, library, prefs
+from . import constants, driver, library, prefs
 
 
 class SNAPBLOCK_OT_add_block(bpy.types.Operator):
@@ -51,9 +51,11 @@ class SNAPBLOCK_OT_add_block(bpy.types.Operator):
                         "That block ('{}') isn't in the library yet.".format(self.type_id))
             return {'CANCELLED'}
 
-        # Link only into the build collection (not the scene's master collection) so
-        # the Outliner shows the grouping cleanly.
-        library.get_build_collection(context).objects.link(obj)
+        # Link into the build collection — or, while a manual is loaded, the current
+        # bag's collection (driver.current_target_collection), so a guided build sorts
+        # itself into per-bag groups in the Outliner. Either way, not the scene's master
+        # collection, so the grouping reads cleanly.
+        driver.current_target_collection(context).objects.link(obj)
 
         # Snap the 3D cursor to the grid and place the block there. We store nothing
         # fancy: integer grid cell = round(world / cell size), back to world coords.
@@ -602,6 +604,31 @@ def _snap_to_grid(obj, context):
     obj.location.z += round(min_z / constants.H) * constants.H - min_z
 
 
+def _rotate_obj_about_center(obj, steps, context):
+    """Turn `obj` `steps`×90° about Z, pivoting on its own footprint center so it spins
+    in place, then re-snap to the grid. Shared by the rotate operator and the ghost
+    builder (a plan's '2x4' is the library '4x2' turned 90°)."""
+    angle = steps * (math.pi / 2)
+    rot = Matrix.Rotation(angle, 4, 'Z')
+
+    # Pivot point = the block's footprint center in world space. bound_box is 8 local
+    # corners; averaging them gives the center regardless of where the origin sits
+    # (ours is at the bottom -X/-Y corner).
+    local_center = sum((Vector(c) for c in obj.bound_box), Vector()) / 8
+    pivot = obj.matrix_world @ local_center
+
+    # Rigid rotation of the whole object about `pivot`: every point x maps to
+    # pivot + rot·(x − pivot). Applying that to the origin gives the new location;
+    # composing rot onto the existing orientation turns the block. Doing the math with
+    # mathutils (not by re-reading matrix_world) means we don't depend on a depsgraph
+    # refresh mid-loop.
+    obj.location = pivot + rot @ (obj.location - pivot)
+    obj.rotation_euler.rotate_axis('Z', angle)
+
+    # Re-snap so odd-dimension blocks land cleanly back on the lattice.
+    _snap_to_grid(obj, context)
+
+
 class SNAPBLOCK_OT_rotate(bpy.types.Operator):
     """Turn the selected blocks 90° around the up (Z) axis, pivoting about each
     block's own footprint center so it spins in place and stays on the grid."""
@@ -624,26 +651,8 @@ class SNAPBLOCK_OT_rotate(bpy.types.Operator):
             self.report({'ERROR'}, "Select a block to rotate.")
             return {'CANCELLED'}
 
-        angle = self.steps * (math.pi / 2)
-        rot = Matrix.Rotation(angle, 4, 'Z')
-
         for obj in targets:
-            # Pivot point = the block's footprint center in world space. bound_box
-            # is 8 local corners; averaging them gives the center regardless of
-            # where the origin sits (ours is at the bottom -X/-Y corner).
-            local_center = sum((Vector(c) for c in obj.bound_box), Vector()) / 8
-            pivot = obj.matrix_world @ local_center
-
-            # Rigid rotation of the whole object about `pivot`: every point x maps
-            # to pivot + rot·(x − pivot). Applying that to the origin gives the new
-            # location; composing rot onto the existing orientation turns the block.
-            # Doing the math with mathutils (not by re-reading matrix_world) means
-            # we don't depend on a depsgraph refresh mid-loop.
-            obj.location = pivot + rot @ (obj.location - pivot)
-            obj.rotation_euler.rotate_axis('Z', angle)
-
-            # Re-snap so odd-dimension blocks land cleanly back on the lattice.
-            _snap_to_grid(obj, context)
+            _rotate_obj_about_center(obj, self.steps, context)
 
         direction = "left" if self.steps > 0 else "right"
         message = ("Turned {} block(s) 90° {} — still on the grid."
@@ -683,6 +692,231 @@ class SNAPBLOCK_OT_delete(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# --- Follow-a-manual driver: ghost hint + navigation operators ---------------
+# The plan/data helpers live in driver.py; the bits that need the material + rotate
+# helpers above (ghost rendering) live here.
+
+def _ghost_material():
+    """The shared translucent 'SnapBlock_Ghost' material for hint previews."""
+    return _get_or_create_material(
+        constants.GHOST_MATERIAL, constants.GHOST_COLOR,
+        constants.MATERIAL_ROUGHNESS, constants.GHOST_OPACITY, 0.0,
+    )
+
+
+def _clear_ghosts(context):
+    """Remove the ghost hint: delete its objects and the throwaway collection. The
+    orphaned meshes are normal Blender behaviour (purged on save / Outliner cleanup)."""
+    coll = bpy.data.collections.get(constants.GHOST_COLLECTION)
+    if coll is None:
+        return
+    for obj in list(coll.objects):
+        bpy.data.objects.remove(obj, do_unlink=True)
+    bpy.data.collections.remove(coll)
+
+
+def _place_min_corner(obj, target, context):
+    """Shift `obj` so its world bounding-box min (-X/-Y/-Z) corner sits at world `target`.
+
+    For a ghost we rotate first (a plan '2x4' is the library '4x2' turned 90°), THEN anchor
+    by the min corner — because the plan's `cell` is the bottom -X/-Y corner of the
+    *as-placed* footprint, which a rotate-about-center wouldn't preserve. bpy gotcha:
+    matrix_world is lazy, so update the view layer before reading bound_box."""
+    context.view_layer.update()
+    mw = obj.matrix_world
+    corners = [mw @ Vector(c) for c in obj.bound_box]
+    obj.location.x += target[0] - min(v.x for v in corners)
+    obj.location.y += target[1] - min(v.y for v in corners)
+    obj.location.z += target[2] - min(v.z for v in corners)
+
+
+def _build_ghosts(context, step):
+    """Show translucent preview copies of `step`'s blocks at their target cells, so you
+    can see where this step goes. Real appended objects (glass-box) — deliberately NOT a
+    GPU draw_handler overlay, which the project dropped as too fragile. Returns the count
+    placed."""
+    _clear_ghosts(context)
+    blocks = step.get("add", [])
+    if not blocks:
+        return 0
+
+    coll = bpy.data.collections.new(constants.GHOST_COLLECTION)
+    context.scene.collection.children.link(coll)
+    mat = _ghost_material()
+
+    placed = 0
+    for block in blocks:
+        type_id, rot_steps = driver.ghost_spec(block)
+        try:
+            obj = library.append_block(type_id)
+        except (FileNotFoundError, ValueError):
+            # A block whose library object is missing just doesn't get a ghost — the
+            # hint is best-effort, never a hard error.
+            continue
+        coll.objects.link(obj)
+        # Rotate first (if the as-placed footprint is the library block turned 90°), then
+        # anchor the min corner exactly on the plan's target cell.
+        if rot_steps:
+            obj.rotation_euler.rotate_axis('Z', rot_steps * (math.pi / 2))
+        gx, gy, gz = block["cell"]
+        _place_min_corner(obj, (gx * constants.U, gy * constants.U, gz * constants.H), context)
+        # Overwrite the appended block's material slot with the ghost material.
+        if obj.data.materials:
+            obj.data.materials[0] = mat
+        else:
+            obj.data.materials.append(mat)
+        obj.name = "Ghost_{}".format(type_id)
+        obj.show_in_front = True   # draw over the solid build so the hint reads
+        obj.hide_select = True     # don't let a ghost steal clicks from the real block
+        placed += 1
+    return placed
+
+
+class SNAPBLOCK_OT_driver_load(bpy.types.Operator):
+    """Open a build-plan JSON and follow it step by step. Pre-creates one collection per
+    bag under 'SnapBlock Build'; blocks you place are sorted into the current bag."""
+    bl_idname = "snapblock.driver_load"
+    bl_label = "Load build plan"
+    bl_description = "Open a build-plan JSON and follow it step by step"
+    bl_options = {'REGISTER'}   # navigation/state, not part of Blender's modeling undo
+
+    filepath: bpy.props.StringProperty(subtype='FILE_PATH')
+    filter_glob: bpy.props.StringProperty(default="*.json", options={'HIDDEN'})
+
+    def invoke(self, context, event):
+        # fileselect_add pops Blender's file browser; it re-runs execute() on confirm
+        # with self.filepath set.
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        try:
+            plan = driver.load_plan(self.filepath)
+        except (ValueError, OSError) as e:
+            self.report({'ERROR'}, "Couldn't load that build plan: {}".format(e))
+            return {'CANCELLED'}
+
+        driver.invalidate_cache(self.filepath)   # force a fresh read on the next get_plan
+        state = context.scene.snapblock_driver
+        state.plan_filepath = self.filepath
+        state.model_name = (plan.get("model") or {}).get("name", "Untitled")
+        state.global_index = 0
+        state.checked_steps = ""
+        state.show_ghost = False
+        _clear_ghosts(context)
+
+        # Pre-create every bag collection so the structure shows in the Outliner now,
+        # then make the first bag active so hand-placed blocks land there.
+        bags = plan.get("bags", [])
+        for bag in bags:
+            driver.ensure_bag_collection(context, bag.get("name", "Bag"))
+        if bags:
+            driver.set_active_bag(context, bags[0].get("name", "Bag"))
+
+        self.report({'INFO'},
+                    "Loaded '{}' — {} step(s) in {} bag(s). Build each step by hand; "
+                    "tick it off as you go.".format(
+                        state.model_name, driver.step_count(plan), len(bags)))
+        return {'FINISHED'}
+
+
+class SNAPBLOCK_OT_driver_goto(bpy.types.Operator):
+    """Move to another step. One parameterised operator: Prev/Next use `delta`, a jump
+    uses `absolute` (>= 0)."""
+    bl_idname = "snapblock.driver_goto"
+    bl_label = "Go to step"
+    bl_description = "Move to another step in the manual"
+    bl_options = {'REGISTER'}
+
+    delta: bpy.props.IntProperty(default=0)
+    absolute: bpy.props.IntProperty(default=-1)   # -1 = use delta; >= 0 = jump there
+
+    def execute(self, context):
+        state = context.scene.snapblock_driver
+        plan = driver.get_plan(state.plan_filepath)
+        if plan is None:
+            self.report({'ERROR'}, "Load a build plan first.")
+            return {'CANCELLED'}
+
+        n = driver.step_count(plan)
+        target = self.absolute if self.absolute >= 0 else state.global_index + self.delta
+        target = max(0, min(n - 1, target))
+        state.global_index = target
+
+        _bi, _si, bag_name, step = driver.locate(plan, target)
+        if bag_name:
+            driver.set_active_bag(context, bag_name)
+        # Keep the ghost in step with where we are, if it's showing.
+        if state.show_ghost:
+            _build_ghosts(context, step)
+        return {'FINISHED'}
+
+
+class SNAPBLOCK_OT_driver_toggle_check(bpy.types.Operator):
+    """Tick a step off (or back on) — honor-system, no scene-checking. Defaults to the
+    current step."""
+    bl_idname = "snapblock.driver_toggle_check"
+    bl_label = "Mark step done"
+    bl_description = "Tick this step off as done (honor system)"
+    bl_options = {'REGISTER'}
+
+    index: bpy.props.IntProperty(default=-1)   # -1 = the current step
+
+    def execute(self, context):
+        state = context.scene.snapblock_driver
+        idx = self.index if self.index >= 0 else state.global_index
+        driver.toggle_checked(state, idx)
+        return {'FINISHED'}
+
+
+class SNAPBLOCK_OT_driver_toggle_ghost(bpy.types.Operator):
+    """Show or hide the 👻 ghost hint — translucent preview copies of the current step's
+    blocks at their target cells, for when you're stuck."""
+    bl_idname = "snapblock.driver_toggle_ghost"
+    bl_label = "Ghost hint"
+    bl_description = "Show translucent previews of this step's blocks where they go"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        state = context.scene.snapblock_driver
+        plan = driver.get_plan(state.plan_filepath)
+        if plan is None:
+            self.report({'ERROR'}, "Load a build plan first.")
+            return {'CANCELLED'}
+
+        state.show_ghost = not state.show_ghost
+        if state.show_ghost:
+            _bi, _si, _bag, step = driver.locate(plan, state.global_index)
+            count = _build_ghosts(context, step)
+            self.report({'INFO'},
+                        "Ghost hint on — {} preview piece(s). They're not part of your "
+                        "build; toggle off to clear.".format(count))
+        else:
+            _clear_ghosts(context)
+            self.report({'INFO'}, "Ghost hint off.")
+        return {'FINISHED'}
+
+
+class SNAPBLOCK_OT_driver_clear(bpy.types.Operator):
+    """Close the manual: clear the current-step/checkoff state and any ghost hint. The
+    bag collections and the blocks you built stay — they're your scene."""
+    bl_idname = "snapblock.driver_clear"
+    bl_label = "Close manual"
+    bl_description = "Stop following the manual (keeps your built blocks and bags)"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        _clear_ghosts(context)
+        state = context.scene.snapblock_driver
+        state.plan_filepath = ""
+        state.model_name = ""
+        state.global_index = 0
+        state.checked_steps = ""
+        state.show_ghost = False
+        self.report({'INFO'}, "Closed the manual. Your blocks and bags are untouched.")
+        return {'FINISHED'}
+
+
 # Each module exposes a `classes` tuple; __init__.py collects them for
 # registration. Order matters: classes a panel references must register first,
 # which is why operators register before panels.
@@ -697,4 +931,9 @@ classes = (
     SNAPBLOCK_OT_nudge,
     SNAPBLOCK_OT_rotate,
     SNAPBLOCK_OT_delete,
+    SNAPBLOCK_OT_driver_load,
+    SNAPBLOCK_OT_driver_goto,
+    SNAPBLOCK_OT_driver_toggle_check,
+    SNAPBLOCK_OT_driver_toggle_ghost,
+    SNAPBLOCK_OT_driver_clear,
 )

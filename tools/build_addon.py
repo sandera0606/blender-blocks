@@ -1,19 +1,9 @@
 """
 SnapBlock — build the installable add-on zip.
 
-UNLIKE the other tools/ scripts, this one runs in a NORMAL terminal, not inside
-Blender — it only zips files, no bpy needed.
-
     python tools/build_addon.py
 
-It packages the snapblock/ package folder into snapblock.zip at the repo root,
-which is what Blender's Edit > Preferences > Add-ons > Install from Disk expects.
-It deliberately leaves out __pycache__/ and .pyc files (build noise that must not
-ship) and the dev/ bridge (it only ever looks inside snapblock/).
-
-NOTE: the bundled snapblock/snapblock_library.blend is whatever is in the folder
-right now. If you've changed the block library, rebuild it (tools/build_library.py
-inside Blender) BEFORE running this so the zip ships the current blocks.
+Packages the snapblock/ package folder into snapblock.zip at the repo root.
 """
 
 import os
@@ -62,8 +52,7 @@ def main():
         print("  + {}".format(arcname))
     print("{} files, {:.0f} KB".format(len(files), os.path.getsize(OUTPUT_ZIP) / 1024))
 
-    # A friendly nudge if the bundled library is missing — the add-on needs it to
-    # place blocks, so a zip without it would install but fail at first click.
+    # Warning if block library isn't included
     if not any(name.endswith("snapblock_library.blend") for _a, name in files):
         print("\nWARNING: snapblock_library.blend is not in the package — "
               "blocks won't load. Run tools/build_library.py first.")

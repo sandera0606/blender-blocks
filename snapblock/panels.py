@@ -16,7 +16,7 @@ bpy notes:
 
 import bpy
 
-from . import constants, prefs
+from . import constants, driver, prefs
 
 
 class SNAPBLOCK_PT_main(bpy.types.Panel):
@@ -170,10 +170,90 @@ class SNAPBLOCK_PT_edit(bpy.types.Panel):
         layout.operator("snapblock.delete", text="Delete selected", icon='TRASH')
 
 
+class SNAPBLOCK_PT_driver(bpy.types.Panel):
+    """Follow a build-plan manual step by step. Hand-build each step yourself; this
+    tracks where you are, lists the step's parts, ticks steps off, sorts your blocks
+    into per-bag collections, and can ghost a step's blocks when you're stuck."""
+    bl_label = "Follow a Manual"
+    bl_idname = "SNAPBLOCK_PT_driver"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_parent_id = "SNAPBLOCK_PT_main"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        state = context.scene.snapblock_driver
+
+        # No plan loaded yet → just the open button.
+        if not state.plan_filepath:
+            layout.label(text="Open a build plan to follow it.")
+            layout.operator("snapblock.driver_load", text="Load build plan…",
+                            icon='FILEBROWSER')
+            return
+
+        plan = driver.get_plan(state.plan_filepath)
+        if plan is None:
+            layout.label(text="Can't read that plan file.", icon='ERROR')
+            layout.operator("snapblock.driver_load", text="Load build plan…",
+                            icon='FILEBROWSER')
+            layout.operator("snapblock.driver_clear", text="Close manual", icon='X')
+            return
+
+        total = driver.step_count(plan)
+        _bi, _si, bag_name, step = driver.locate(plan, state.global_index)
+
+        # Header: model, bag, step counter + how many ticked off.
+        layout.label(text=state.model_name, icon='MOD_BUILD')
+        row = layout.row()
+        row.label(text="Bag: {}".format(bag_name))
+        row.label(text="Step {} of {}".format(state.global_index + 1, total))
+        layout.label(text="{} of {} steps done".format(driver.checked_count(state), total))
+
+        # Parts list for this step (derived, like the manual's).
+        box = layout.box()
+        box.label(text="This step needs:")
+        parts = driver.parts_for_step(step)
+        if parts:
+            for line in parts:
+                box.label(text=line, icon='MESH_CUBE')
+        else:
+            box.label(text="(nothing — an empty step)")
+
+        # Honor-system checkoff for the current step.
+        checked = driver.is_checked(state, state.global_index)
+        op = layout.operator(
+            "snapblock.driver_toggle_check",
+            text="Done — built it" if checked else "Mark this step done",
+            icon='CHECKBOX_HLT' if checked else 'CHECKBOX_DEHLT',
+            depress=checked,
+        )
+        op.index = state.global_index
+
+        # Navigation: one operator, two buttons (set every prop on each — last-used bleed).
+        row = layout.row(align=True)
+        op = row.operator("snapblock.driver_goto", text="◀ Prev")
+        op.delta, op.absolute = -1, -1
+        op = row.operator("snapblock.driver_goto", text="Next ▶")
+        op.delta, op.absolute = 1, -1
+
+        # Ghost hint: an operator (not a bare prop) so it can build/clear the previews;
+        # depress shows whether it's currently on.
+        layout.operator(
+            "snapblock.driver_toggle_ghost",
+            text="Ghost hint: on" if state.show_ghost else "Ghost hint: off",
+            icon='GHOST_ENABLED', depress=state.show_ghost,
+        )
+
+        layout.separator()
+        layout.operator("snapblock.driver_clear", text="Close manual", icon='X')
+
+
 classes = (
     SNAPBLOCK_PT_main,
     SNAPBLOCK_PT_blocks,
     SNAPBLOCK_PT_colors,
     SNAPBLOCK_PT_move,
     SNAPBLOCK_PT_edit,
+    SNAPBLOCK_PT_driver,
 )

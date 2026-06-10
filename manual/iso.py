@@ -47,9 +47,18 @@ def _fade(rgb):
     return tuple(c + (1.0 - c) * _FADE for c in rgb)
 
 
-def painter_order(blocks):
-    """Back-to-front order for axis-aligned blocks viewed from the +X+Y+Z corner."""
-    return sorted(blocks, key=lambda b: (b.x + b.y, b.z))
+def visible_studs(b, occ):
+    """The footprint cells of `b` that show a stud given occupancy `occ`.
+
+    A studded block shows a stud on (cx, cy) iff nothing sits directly on it, i.e.
+    (cx, cy, b.z + 1) is not in `occ`. Smooth blocks never show studs. `occ` is the
+    occupancy of the group `b` belongs to (see draw_diagram): for built blocks that's the
+    built blocks only, so a stud the hovering piece is about to land on still shows; for
+    the hovering cluster it's that cluster only. A stud appears while exposed in its group
+    and vanishes once something is actually placed on it."""
+    if b.finish != "stud":
+        return []
+    return [(cx, cy) for (cx, cy) in b.footprint if (cx, cy, b.z + 1) not in occ]
 
 
 def _Color():
@@ -97,20 +106,78 @@ def _draw_stud(c, origin, cx, cy, ztop, rgb, s, *, faded):
     _draw_box(c, origin, _box_faces(sx0, sy0, ztop, sx1, sy1, ztop + STUD_HEIGHT, s), rgb, faded=faded)
 
 
-def _draw_group(c, origin, blocks, palette, s, *, faded, dz=0.0):
-    """Draw a set of blocks: ALL bodies first (back-to-front), THEN all studs
-    (back-to-front). Two passes so no block body can paint over another block's
-    stud — studs always sit on top of every body."""
-    for b in painter_order(blocks):
-        _draw_body(c, origin, b, palette[b.material], s, faded=faded, dz=dz)
-    studs = []
+def _is_behind(a, b):
+    """True if box `a` is entirely on the FAR side of box `b` along some axis, i.e. `a`
+    is behind `b` for the +X+Y+Z view (so `a` must be painted first). Boxes are
+    (x0, x1, y0, y1, z0, z1), half-open. The view nears as x, y, or z grows, so `a` is
+    behind if it's separated below `b` on any single axis."""
+    return a[1] <= b[0] or a[3] <= b[2] or a[5] <= b[4]
+
+
+def _painter_order(boxes):
+    """Back-to-front draw order for axis-aligned boxes (the painter's algorithm done
+    right). A single scalar key (min corner, or nearest cell) can NOT order boxes of
+    different sizes: a big overhanging block spans a whole range of depths, so by its min
+    corner it sorts as 'far' and paints under the small blocks it actually sits in front
+    of, while by its nearest cell it paints over its own far studs. Instead we topologically
+    sort by the real occlusion relation.
+
+    Edge i→j (paint i before j) is added only when exactly ONE of the two is behind the
+    other (`_is_behind`). If both are 'behind' each other, they're separated along
+    conflicting axes — they don't overlap on screen, so either order is fine and we add no
+    edge (this also keeps the graph acyclic). Studs are inset from the cell edges, so a
+    stud never overlaps a neighbour cell on screen; together with this relation that makes
+    the order exact. Deterministic (ties/any residual cycle break on min-corner depth then
+    index). O(n²), which is nothing for a per-diagram block count."""
+    n = len(boxes)
+    adj = [[] for _ in range(n)]
+    indeg = [0] * n
+    for i in range(n):
+        bi = boxes[i]
+        for j in range(i + 1, n):
+            bj = boxes[j]
+            i_behind, j_behind = _is_behind(bi, bj), _is_behind(bj, bi)
+            if i_behind and not j_behind:
+                adj[i].append(j); indeg[j] += 1
+            elif j_behind and not i_behind:
+                adj[j].append(i); indeg[i] += 1
+    rank = [b[0] + b[2] + b[4] for b in boxes]   # tie/cycle break: farther min corner first
+    order, placed = [], [False] * n
+    avail = {i for i in range(n) if indeg[i] == 0}
+    while len(order) < n:
+        pool = avail or {i for i in range(n) if not placed[i]}   # cycle fallback
+        i = min(pool, key=lambda k: (rank[k], k))
+        avail.discard(i)
+        placed[i] = True
+        order.append(i)
+        for j in adj[i]:
+            indeg[j] -= 1
+            if indeg[j] == 0 and not placed[j]:
+                avail.add(j)
+    return order
+
+
+def _draw_group(c, origin, blocks, palette, s, occ, *, faded, dz=0.0):
+    """Draw a set of blocks back-to-front, with bodies AND studs interleaved in one
+    correct painter's order (see _painter_order) so a body in front hides a stud behind
+    it and a small block in front hides the big overhanging block behind it. `occ` selects
+    which cells show a stud (visible_studs); studs are inset boxes sitting at z+1."""
+    boxes, draws = [], []
     for b in blocks:
-        for (cx, cy) in b.studs:
-            # depth key includes z so studs on taller blocks draw in front
-            studs.append((cx + cy + b.z, cx, cy, b.z + 1 + dz, palette[b.material]))
-    studs.sort(key=lambda t: t[0])
-    for (_key, cx, cy, ztop, rgb) in studs:
-        _draw_stud(c, origin, cx, cy, ztop, rgb, s, faded=faded)
+        boxes.append((b.x, b.x + b.width, b.y, b.y + b.depth, b.z, b.z + 1))
+        draws.append(("body", b))
+        for (cx, cy) in visible_studs(b, occ):
+            boxes.append((cx + STUD_INSET, cx + 1 - STUD_INSET,
+                          cy + STUD_INSET, cy + 1 - STUD_INSET,
+                          b.z + 1, b.z + 1 + STUD_HEIGHT))
+            draws.append(("stud", (cx, cy, b.z + 1 + dz, palette[b.material])))
+    for idx in _painter_order(boxes):
+        kind, payload = draws[idx]
+        if kind == "stud":
+            cx, cy, ztop, rgb = payload
+            _draw_stud(c, origin, cx, cy, ztop, rgb, s, faded=faded)
+        else:
+            _draw_body(c, origin, payload, palette[payload.material], s, faded=faded, dz=dz)
 
 
 def _drop_line(c, origin, b, s):
@@ -148,10 +215,38 @@ def fit_scale(blocks, area_w, area_h, *, hover_cells=None, fill=0.86, max_scale=
     return min(max_scale, (area_w / w) * fill, (area_h / h) * fill)
 
 
-def draw_diagram(c, rect, cumulative, new_cells, palette):
+def _ground_shadow(c, origin, bx0, by0, bx1, by1, s):
+    """A soft translucent disc under the model so it sits on a surface instead of floating
+    in white. Drawn first (behind every block). Centred on the model's horizontal middle
+    and tucked just under its lowest visible point (max y in this y-down space)."""
+    Color = _Color()
+    ox, oy = origin
+    cx = ox + (bx0 + bx1) / 2.0
+    cy = oy - by1 + TILE_H * s * 0.5
+    w = (bx1 - bx0) * 0.78
+    h = max(TILE_H * s * 1.7, 6.0)
+    c.saveState()
+    c.setFillColor(Color(0.0, 0.0, 0.0))
+    c.setFillAlpha(0.10)
+    c.setStrokeAlpha(0.0)
+    c.ellipse(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, stroke=0, fill=1)
+    c.restoreState()
+
+
+def draw_diagram(c, rect, cumulative, new_cells, palette, *, ground_shadow=False):
     """Draw the build-so-far in page rect (x0,y0,x1,y1, y-up). Blocks whose origin cell
     is in `new_cells` hover full-colour on drop-lines; the rest are pale context. With
-    `new_cells` empty (cover / finished) everything is full colour."""
+    `new_cells` empty (cover / finished) everything is full colour.
+
+    `ground_shadow` adds a soft disc under the model (for the hero pages — cover/finished —
+    where the model stands alone rather than mid-step).
+
+    Studs are drawn per the CURRENT visual state. The new blocks hover above their slots,
+    so they don't cover anything yet: a built (base) block shows a stud wherever it isn't
+    covered by another BUILT block — including the cells this step's pieces are about to
+    drop onto, so you can see the studs you'll clutch onto. Hence two occupancies: base
+    studs from the built blocks only, new (hovering) studs from the new cluster only."""
+    from .buildplan import occupancy
     x0, y0, x1, y1 = rect
     area_w, area_h = x1 - x0, y1 - y0
     s = fit_scale(cumulative, area_w, area_h, hover_cells=new_cells)
@@ -160,14 +255,17 @@ def draw_diagram(c, rect, cumulative, new_cells, palette):
     ox = x0 + (area_w - (bx1 - bx0)) / 2.0 - bx0
     oy = y1 - (area_h - (by1 - by0)) / 2.0 + by0
 
+    if ground_shadow:
+        _ground_shadow(c, (ox, oy), bx0, by0, bx1, by1, s)
+
     highlight = bool(new_cells)
     base = [b for b in cumulative if not (highlight and b.cell in new_cells)]
     new = [b for b in cumulative if highlight and b.cell in new_cells]
 
-    _draw_group(c, (ox, oy), base, palette, s, faded=highlight)
+    _draw_group(c, (ox, oy), base, palette, s, occupancy(base), faded=highlight)
     for b in new:
         _drop_line(c, (ox, oy), b, s)
-    _draw_group(c, (ox, oy), new, palette, s, faded=False, dz=HOVER_CELLS)
+    _draw_group(c, (ox, oy), new, palette, s, occupancy(new), faded=False, dz=HOVER_CELLS)
 
 
 def draw_part_icon(c, center, w, d, finish, palette_rgb, size):

@@ -5,8 +5,9 @@ sequence of steps. It is the one source of truth shared by two independent progr
 
 - **the manual generator** (`manual/`, pure Python, no Blender) — reads a plan and renders
   a cute nanoblock-style PDF booklet.
-- **the in-Blender toy** (`snapblock/`, bpy) — *(later)* reads the same plan to drive the
-  hand-build experience (current step, ghost hint, honor-system checkoff, bag-collections).
+- **the in-Blender toy** (`snapblock/`, bpy) — reads the same plan (`snapblock/driver.py` +
+  the `snapblock.driver_*` operators / "Follow a Manual" panel) to drive the hand-build
+  experience: current step, parts list, ghost hint, honor-system checkoff, bag-collections.
 
 Neither program imports the other. They agree only on this file format. That keeps the
 bpy / pure-Python split clean: the generator never has to load `bpy`, and the add-on
@@ -30,8 +31,7 @@ never has to load the generator's drawing deps.
       "steps": [
         { "add": [
           { "cell": [0, 0, 0], "type": "4x2", "material": "Gray", "finish": "smooth" },
-          { "cell": [4, 0, 0], "type": "2x2", "material": "Yellow", "finish": "stud",
-            "studs": [[4,0],[5,0],[4,1],[5,1]] }
+          { "cell": [4, 0, 0], "type": "2x2", "material": "Yellow", "finish": "stud" }
         ] }
       ]
     }
@@ -64,17 +64,31 @@ Pipeline: `model.vox → vox_import → voxel model → planner → build plan �
         (so `"1x4"` is a `"4x1"` block rotated); parts lists group by that canonical id.
       - `material` — a key into `palette`.
       - `finish` — `"stud"` or `"smooth"` (optional; default `"stud"`).
-      - `studs` — the footprint cells `[[cx,cy], …]` that show a stud (optional). The
-        planner sets exactly the exposed studded cells; if omitted, a `stud` block defaults
-        to its whole top and a `smooth` block to none.
+
+> **Removed: `studs`.** Earlier versions stored, per block, the exact cells that show a
+> stud. That was computed from the *finished* model, so a cell covered in a later step
+> wrongly showed no stud in the earlier steps where it was still exposed. Stud visibility
+> is now a render-time function of `finish` + cumulative occupancy: a `stud` block shows a
+> stud on a cell while nothing is stacked on it yet (see `iso.visible_studs` /
+> `buildplan.occupancy`), so it appears while exposed and vanishes once covered. A legacy
+> `studs` array is ignored on load.
 
 ## Rules / conventions
 
 - **Order is the build order.** Bags, then steps within a bag, then the `add` list within
   a step, are all in literal document order. There is no separate ordering field.
-- **Build bottom-up, supported.** The plan *should* be ordered so that every block, when
-  its step runs, already rests on a neighbour below or beside it — you never place into
-  mid-air. (Enforcing/generating this is the voxel→plan step's job, not the format's.)
+- **Build bottom-up, supported, and connected.** The plan is ordered so that every block,
+  when its step runs, already rests on something — you never place into mid-air. `planner.py`
+  *enforces* two structural rules and refuses to emit a plan that breaks either (override
+  with `--allow-floating`):
+  - **Support:** every block above the baseplate needs a filled cell directly below at least
+    one of its footprint cells (`z==0` rests on the assumed baseplate). One supporting cell
+    is enough, so overhang/cantilever is allowed.
+  - **Connectivity:** the whole build must be one piece held together by stud coupling —
+    every block joins the rest by sitting directly on, or directly under, another block
+    (same-layer neighbours don't count; there's no assumed baseplate gluing a flat layer
+    together). The test is "lift the finished model and it stays in one piece." This catches
+    e.g. a wide flat base whose outer ring has nothing above or below to lock it on.
 - **A step's diagram shows the cumulative build** up to and including that step, with that
   step's `add` blocks highlighted. The generator accumulates; the plan only stores deltas.
 - **A step's parts list is derived**, not stored: count this step's `add` by
