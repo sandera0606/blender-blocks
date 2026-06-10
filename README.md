@@ -38,10 +38,21 @@ Back then, I wanted to build a Blender add-on for basic block summoning and mate
 
 Now you will find it in your add on menu (right side of the default viewport)!
 
+![Hidden add-on menu](docs/tucked-addon.png)
+![Blender Blocks add on!](docs/blender-blocks.png)
+
 ## How to use? The basics
-- click on the preset block shapes in the add on to summon them
-- move blocks around with g -> move mouse around OR the 'move' tool in Blender's left side bar & drag arrows
+- click on one of the preset blocks in the list of blocks (1x1, 2x1, etc) to summon them onto the screen
+- move blocks around with 
+  - g -> move mouse around,
+  - the 'move' tool in Blender's left side bar & drag arrows, OR
+  - the buttons in the add on
+
+![Demonstrate summoning and move](docs/move-block.gif)
+
 - select a colour under the add on's materials tab to change the colour of a brick
+
+![GIF demonstrating materials](docs/material-demo.gif)
 
 ## Code
 Written in Python against Blender's API (`bpy`), for Blender 4.2+.
