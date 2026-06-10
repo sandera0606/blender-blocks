@@ -1,5 +1,5 @@
 """
-SnapBlock — a Blender add-on for building with snap-together blocks on a grid.
+Blender Blocks — a Blender add-on for building with snap-together blocks on a grid.
 A toy for my own use. Every action leaves behind normal Blender objects,
 materials, and collections, so I can keep editing the build by hand in Blender.
 
@@ -8,12 +8,12 @@ and calls register() when it's enabled and unregister() when it's disabled.
 """
 
 bl_info = {
-    "name": "SnapBlock",
+    "name": "Blender Blocks",
     "description": "Build with snap-together blocks on a grid. Everything stays normal, editable Blender data.",
     "author": "Sandra",
     "version": (0, 1, 0),
     "blender": (4, 2, 0),
-    "location": "View3D > Sidebar (press N) > SnapBlock tab",
+    "location": "View3D > Sidebar (press N) > Blender Blocks tab",
     "category": "Add Mesh",
 }
 
@@ -30,7 +30,7 @@ classes = (*prefs.classes, *driver.classes, *operators.classes, *panels.classes)
 
 # Note: there are deliberately no arrow-key shortcuts for the nudge. Blender binds
 # the arrow keys to frame stepping in its default keymap, and an add-on keymap item
-# fights that conflict more than it helps. The Move panel buttons (panels.SNAPBLOCK_PT_move)
+# fights that conflict more than it helps. The Move panel buttons (panels.BLENDER_BLOCKS_PT_move)
 # are the single, reliable, glass-box-visible way to nudge a block one cell.
 
 
@@ -41,12 +41,12 @@ def register():
     # registered (it's in `classes`, registered just above). PointerProperty hangs one
     # instance off each scene; it's saved in the .blend, so follow-a-manual progress
     # persists. This is the only scene-level property the add-on adds.
-    bpy.types.Scene.snapblock_driver = bpy.props.PointerProperty(type=driver.SNAPBLOCK_driver_state)
+    bpy.types.Scene.blender_blocks_driver = bpy.props.PointerProperty(type=driver.BLENDER_BLOCKS_driver_state)
 
 
 def unregister():
     # Remove the Scene pointer before unregistering its class, mirroring register().
-    del bpy.types.Scene.snapblock_driver
+    del bpy.types.Scene.blender_blocks_driver
     # Reverse order so nothing is removed while something still depends on it.
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)

@@ -1,13 +1,13 @@
 """
-SnapBlock block loading — append blocks from the library at runtime, and store the
+Blender Blocks block loading — append blocks from the library at runtime, and store the
 ones the user captures from a selection.
 
 Holds the pieces the block operators need:
   - append_block(type_id): pull one block out of the library (custom one if present,
-    else the bundled snapblock_library.blend).
+    else the bundled blender_blocks_library.blend).
   - write_custom_block / delete_custom_block: the geometry side of a captured block.
   - footprint_min / footprint_dims: read a mesh's grid footprint off its verts.
-  - get_build_collection(context): the "SnapBlock Build" collection blocks go into.
+  - get_build_collection(context): the "Blender Blocks Build" collection blocks go into.
 
 Nothing here writes to the bundled library; custom blocks go to the per-user dir.
 """
@@ -110,7 +110,7 @@ def delete_custom_block(type_id):
 
 
 def get_build_collection(context):
-    """Return the 'SnapBlock Build' collection, creating it (and linking it to the
+    """Return the 'Blender Blocks Build' collection, creating it (and linking it to the
     scene) if it doesn't exist yet. Placed blocks live here so the grouping shows
     up in the Outliner — collections are a real Blender feature we want to surface.
     """

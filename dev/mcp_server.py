@@ -1,14 +1,14 @@
-r"""SnapBlock MCP server.
+r"""Blender Blocks MCP server.
 
 Runs in a NORMAL Python venv (not Blender's bundled Python). It exposes a few
 tools to Claude Code over stdio; each tool opens a localhost socket to the
 Blender-side bridge (dev/blender_bridge.py), sends one JSON request, and returns
 the reply. The Blender add-on must be running with its bridge server started
-(N-panel > SnapBlock Dev > Start Bridge Server).
+(N-panel > Blender Blocks Dev > Start Bridge Server).
 
 Setup (run from the repo root):
     pip install mcp
-    claude mcp add snapblock-blender -- .\.venv\Scripts\python.exe .\dev\mcp_server.py
+    claude mcp add blender_blocks-blender -- .\.venv\Scripts\python.exe .\dev\mcp_server.py
 """
 
 import base64
@@ -23,7 +23,7 @@ PORT = 9876
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCE_BLEND = REPO_ROOT / "source_blocks" / "all_blocks.blend"
 
-mcp = FastMCP("snapblock-blender")
+mcp = FastMCP("blender_blocks-blender")
 
 
 def _call(tool, args):
@@ -45,7 +45,7 @@ def _call(tool, args):
             "ok": False,
             "error": (
                 "Couldn't reach the Blender bridge on {}:{}. Is Blender open with "
-                "the bridge started? (N-panel > SnapBlock Dev > Start Bridge Server)"
+                "the bridge started? (N-panel > Blender Blocks Dev > Start Bridge Server)"
             ).format(HOST, PORT),
         }
 
@@ -104,7 +104,7 @@ def get_viewport_screenshot(max_size: int = 1024, frame: bool = False, target: s
     or a run_python assertion) instead of a screenshot.
 
     Set frame=True to point the view at the `target` collection (or the
-    `SnapBlock Preview` collection, else everything) before capturing, so the shot
+    `Blender Blocks Preview` collection, else everything) before capturing, so the shot
     is centered on what you're checking instead of the current camera angle.
     """
     resp = _call("get_viewport_screenshot", {"max_size": max_size, "frame": frame, "target": target})
@@ -114,10 +114,10 @@ def get_viewport_screenshot(max_size: int = 1024, frame: bool = False, target: s
 
 
 @mcp.tool()
-def reload_addon(module: str = "snapblock") -> str:
-    """Reload a SnapBlock package from the repo working tree in the live session.
+def reload_addon(module: str = "blender_blocks") -> str:
+    """Reload a Blender Blocks package from the repo working tree in the live session.
 
-    Use after editing files under `snapblock/` to apply the changes without
+    Use after editing files under `blender_blocks/` to apply the changes without
     rebuilding/reinstalling a zip: it unregisters the old version, re-imports the
     package fresh, and calls register(). A failed register() comes back as a
     traceback string (Blender doesn't crash) — fix the file and call again.
@@ -126,7 +126,7 @@ def reload_addon(module: str = "snapblock") -> str:
 
 
 @mcp.tool()
-def clear_preview(collection: str = "SnapBlock Preview") -> str:
+def clear_preview(collection: str = "Blender Blocks Preview") -> str:
     """Remove a preview collection and the datablocks it brought in, reverting a
     preview you appended into the user's live scene.
 

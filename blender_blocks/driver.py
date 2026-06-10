@@ -170,7 +170,7 @@ def checked_count(state):
 
 # --- Bag collections + the "active bag" so hand-placed blocks land in the right one ---
 def ensure_bag_collection(context, bag_name):
-    """Get-or-create the collection for a bag, nested under 'SnapBlock Build'.
+    """Get-or-create the collection for a bag, nested under 'Blender Blocks Build'.
 
     bpy note: collection data-names are unique across the whole file, so we namespace the
     bag name (BAG_COLLECTION_PREFIX) to avoid colliding with some unrelated 'Walls'."""
@@ -215,8 +215,8 @@ def set_active_bag(context, bag_name):
 
 def current_target_collection(context):
     """Where a hand-placed block should be linked: the active bag's collection while a
-    plan is loaded, else the plain 'SnapBlock Build' collection. Called by add_block."""
-    state = getattr(context.scene, "snapblock_driver", None)
+    plan is loaded, else the plain 'Blender Blocks Build' collection. Called by add_block."""
+    state = getattr(context.scene, "blender_blocks_driver", None)
     if state is not None and state.plan_filepath:
         plan = get_plan(state.plan_filepath)
         if plan is not None:
@@ -244,10 +244,10 @@ def ghost_spec(block):
     return normalize_id(w, d), (1 if w > d else 0)
 
 
-class SNAPBLOCK_driver_state(bpy.types.PropertyGroup):
+class BLENDER_BLOCKS_driver_state(bpy.types.PropertyGroup):
     """Per-scene driver state. A PropertyGroup is Blender's serializable struct: it's
     saved in the .blend and visible/editable, so progress is glass-box and survives a
-    reload. Attached to every Scene as scene.snapblock_driver in __init__.py."""
+    reload. Attached to every Scene as scene.blender_blocks_driver in __init__.py."""
     plan_filepath: bpy.props.StringProperty(subtype='FILE_PATH')
     model_name: bpy.props.StringProperty()
     global_index: bpy.props.IntProperty(default=0, min=0)
@@ -257,5 +257,5 @@ class SNAPBLOCK_driver_state(bpy.types.PropertyGroup):
 
 
 classes = (
-    SNAPBLOCK_driver_state,
+    BLENDER_BLOCKS_driver_state,
 )

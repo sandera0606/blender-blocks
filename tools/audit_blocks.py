@@ -1,5 +1,5 @@
 """
-SnapBlock — block audit (READ-ONLY).
+Blender Blocks — block audit (READ-ONLY).
 
 Run this inside Blender's Scripting tab. It appends the blocks from your master
 library purely to *inspect* them, prints a report, and writes/saves NOTHING.
@@ -28,7 +28,7 @@ from mathutils import Vector
 try:
     REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 except NameError:
-    REPO = ""   # e.g. r"D:\code\snapblock" — only needed if you pasted the script
+    REPO = ""   # e.g. r"D:\code\blender_blocks" — only needed if you pasted the script
 SOURCE_PATH = os.path.join(REPO, "source_blocks", "all_blocks.blend")
 
 COLLECTION_NAME = "blocks"   # the collection inside the source file
@@ -125,7 +125,7 @@ def mm(x):
 
 def main():
     print("\n" + "=" * 64)
-    print("SnapBlock block audit  (read-only — nothing is saved)")
+    print("Blender Blocks block audit  (read-only — nothing is saved)")
     print("Source:", SOURCE_PATH)
     print("=" * 64)
 

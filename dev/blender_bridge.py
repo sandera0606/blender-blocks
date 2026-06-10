@@ -1,9 +1,9 @@
 bl_info = {
-    "name": "SnapBlock Dev Bridge",
-    "author": "SnapBlock",
+    "name": "Blender Blocks Dev Bridge",
+    "author": "Blender Blocks",
     "version": (0, 1, 0),
     "blender": (4, 2, 0),
-    "location": "View3D > N-panel > SnapBlock Dev",
+    "location": "View3D > N-panel > Blender Blocks Dev",
     "description": "Dev-only bridge: lets an external MCP server run bpy in this session.",
     "category": "Development",
 }
@@ -50,7 +50,7 @@ def tool_run_python(args):
     as data, never as a crash. Convention: set a variable named `result` and its
     repr is returned too."""
     code = args.get("code", "")
-    namespace = {"bpy": bpy, "__name__": "__snapblock_exec__"}
+    namespace = {"bpy": bpy, "__name__": "__blender_blocks_exec__"}
     buf = io.StringIO()
     error = None
     try:
@@ -110,7 +110,7 @@ def _capture_viewport_png(win, area, region, max_size):
     Stashes/restores the scene's render settings so capturing leaves the user's
     scene untouched. Shared by the plain and framed screenshot paths.
     """
-    path = os.path.join(tempfile.gettempdir(), "snapblock_viewport.png")
+    path = os.path.join(tempfile.gettempdir(), "blender_blocks_viewport.png")
     render = bpy.context.scene.render
     saved = (render.filepath, render.image_settings.file_format,
              render.resolution_x, render.resolution_y, render.resolution_percentage)
@@ -139,11 +139,11 @@ def _capture_viewport_png(win, area, region, max_size):
 
 def _frame_view(win, area, region, target):
     """Point the given viewport at the interesting objects before a screenshot:
-    the `target` collection if named and non-empty, else `SnapBlock Preview` if it
+    the `target` collection if named and non-empty, else `Blender Blocks Preview` if it
     exists, otherwise everything. Best-effort — never fails the screenshot — and
     stashes/restores the selection so framing stays glass-box-clean.
     """
-    name = target or "SnapBlock Preview"
+    name = target or "Blender Blocks Preview"
     coll = bpy.data.collections.get(name)
     view = bpy.context.view_layer
     saved_active = view.objects.active
@@ -177,7 +177,7 @@ def tool_get_viewport_screenshot(args):
 
     Captures what you'd see in the viewport (current angle + shading), without UI
     chrome, via an OpenGL render. With frame=True, first points the view at the
-    target/`SnapBlock Preview` collection (else frames all) so the capture is
+    target/`Blender Blocks Preview` collection (else frames all) so the capture is
     centered on the thing being checked.
     """
     max_size = int(args.get("max_size", 1024))
@@ -198,7 +198,7 @@ def tool_get_viewport_screenshot(args):
 
 
 def tool_reload_addon(args):
-    """Reload a SnapBlock package from the working tree so file edits take effect
+    """Reload a Blender Blocks package from the working tree so file edits take effect
     without rebuilding/reinstalling a zip.
 
     bpy note: classes double-register if register() runs without a prior
@@ -208,10 +208,10 @@ def tool_reload_addon(args):
     register() that fails partway may leave some classes registered; the returned
     traceback is the signal to fix the file and call this again.
     """
-    module = args.get("module", "snapblock")
+    module = args.get("module", "blender_blocks")
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if repo_root not in sys.path:
-        sys.path.insert(0, repo_root)  # so `import snapblock` resolves from the repo, no zip install
+        sys.path.insert(0, repo_root)  # so `import blender_blocks` resolves from the repo, no zip install
 
     notes = []
     old = sys.modules.get(module)
@@ -243,7 +243,7 @@ def tool_clear_preview(args):
     users, so anything the user also uses elsewhere keeps a user and survives. This
     is what makes a preview cleanly reversible.
     """
-    name = args.get("collection", "SnapBlock Preview")
+    name = args.get("collection", "Blender Blocks Preview")
     coll = bpy.data.collections.get(name)
     if coll is None:
         return {"ok": True, "stdout": "nothing to clear (no '{}' collection)".format(name)}
@@ -386,8 +386,8 @@ def _stop_server():
 
 # --- Operators + panel --------------------------------------------------------
 
-class SNAPBLOCK_OT_start_bridge(bpy.types.Operator):
-    bl_idname = "snapblock.start_bridge"
+class BLENDER_BLOCKS_OT_start_bridge(bpy.types.Operator):
+    bl_idname = "blender_blocks.start_bridge"
     bl_label = "Start Bridge Server"
     bl_description = "Open the localhost socket so the MCP server can drive this session"
 
@@ -404,8 +404,8 @@ class SNAPBLOCK_OT_start_bridge(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SNAPBLOCK_OT_stop_bridge(bpy.types.Operator):
-    bl_idname = "snapblock.stop_bridge"
+class BLENDER_BLOCKS_OT_stop_bridge(bpy.types.Operator):
+    bl_idname = "blender_blocks.stop_bridge"
     bl_label = "Stop Bridge Server"
     bl_description = "Close the bridge socket"
 
@@ -432,17 +432,17 @@ def _report_reply(op, reply):
     return {'FINISHED'}
 
 
-class SNAPBLOCK_OT_dev_reload(bpy.types.Operator):
-    bl_idname = "snapblock.dev_reload"
-    bl_label = "Reload snapblock"
-    bl_description = "Reload the snapblock add-on from the working tree (apply file edits)"
+class BLENDER_BLOCKS_OT_dev_reload(bpy.types.Operator):
+    bl_idname = "blender_blocks.dev_reload"
+    bl_label = "Reload blender_blocks"
+    bl_description = "Reload the blender_blocks add-on from the working tree (apply file edits)"
 
     def execute(self, context):
         return _report_reply(self, tool_reload_addon({}))
 
 
-class SNAPBLOCK_OT_dev_reset(bpy.types.Operator):
-    bl_idname = "snapblock.dev_reset"
+class BLENDER_BLOCKS_OT_dev_reset(bpy.types.Operator):
+    bl_idname = "blender_blocks.dev_reset"
     bl_label = "Reset Scene"
     bl_description = "Empty scene (File > New, no cube). Refuses if there are unsaved changes"
 
@@ -450,17 +450,17 @@ class SNAPBLOCK_OT_dev_reset(bpy.types.Operator):
         return _report_reply(self, tool_reset_scene({}))
 
 
-class SNAPBLOCK_OT_dev_clear(bpy.types.Operator):
-    bl_idname = "snapblock.dev_clear"
+class BLENDER_BLOCKS_OT_dev_clear(bpy.types.Operator):
+    bl_idname = "blender_blocks.dev_clear"
     bl_label = "Clear Preview"
-    bl_description = "Remove the SnapBlock Preview collection and the data it brought in"
+    bl_description = "Remove the Blender Blocks Preview collection and the data it brought in"
 
     def execute(self, context):
         return _report_reply(self, tool_clear_preview({}))
 
 
-class SNAPBLOCK_OT_dev_dump(bpy.types.Operator):
-    bl_idname = "snapblock.dev_dump"
+class BLENDER_BLOCKS_OT_dev_dump(bpy.types.Operator):
+    bl_idname = "blender_blocks.dev_dump"
     bl_label = "Dump Library"
     bl_description = "Print the source block library's contents to the system console"
 
@@ -479,8 +479,8 @@ class SNAPBLOCK_OT_dev_dump(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SNAPBLOCK_OT_dev_scene(bpy.types.Operator):
-    bl_idname = "snapblock.dev_scene"
+class BLENDER_BLOCKS_OT_dev_scene(bpy.types.Operator):
+    bl_idname = "blender_blocks.dev_scene"
     bl_label = "Scene Summary"
     bl_description = "Print the scene's objects/collections/materials to the system console"
 
@@ -493,41 +493,41 @@ class SNAPBLOCK_OT_dev_scene(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SNAPBLOCK_PT_dev(bpy.types.Panel):
-    bl_label = "SnapBlock Dev"
+class BLENDER_BLOCKS_PT_dev(bpy.types.Panel):
+    bl_label = "Blender Blocks Dev"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "SnapBlock Dev"
+    bl_category = "Blender Blocks Dev"
 
     def draw(self, context):
         layout = self.layout
         if _state["running"]:
             layout.label(text="Listening on {}:{}".format(HOST, PORT), icon='RADIOBUT_ON')
-            layout.operator("snapblock.stop_bridge", icon='PAUSE')
+            layout.operator("blender_blocks.stop_bridge", icon='PAUSE')
         else:
             layout.label(text="Stopped", icon='RADIOBUT_OFF')
-            layout.operator("snapblock.start_bridge", icon='PLAY')
+            layout.operator("blender_blocks.start_bridge", icon='PLAY')
 
         # These run in-process, so they work even when the socket server is stopped.
         layout.separator()
         col = layout.column(align=True)
         col.label(text="Dev actions:")
-        col.operator("snapblock.dev_reload", icon='FILE_REFRESH')
-        col.operator("snapblock.dev_reset", icon='FILE_NEW')
-        col.operator("snapblock.dev_dump", icon='ASSET_MANAGER')
-        col.operator("snapblock.dev_scene", icon='SCENE_DATA')
-        col.operator("snapblock.dev_clear", icon='TRASH')
+        col.operator("blender_blocks.dev_reload", icon='FILE_REFRESH')
+        col.operator("blender_blocks.dev_reset", icon='FILE_NEW')
+        col.operator("blender_blocks.dev_dump", icon='ASSET_MANAGER')
+        col.operator("blender_blocks.dev_scene", icon='SCENE_DATA')
+        col.operator("blender_blocks.dev_clear", icon='TRASH')
 
 
 _classes = (
-    SNAPBLOCK_OT_start_bridge,
-    SNAPBLOCK_OT_stop_bridge,
-    SNAPBLOCK_OT_dev_reload,
-    SNAPBLOCK_OT_dev_reset,
-    SNAPBLOCK_OT_dev_clear,
-    SNAPBLOCK_OT_dev_dump,
-    SNAPBLOCK_OT_dev_scene,
-    SNAPBLOCK_PT_dev,
+    BLENDER_BLOCKS_OT_start_bridge,
+    BLENDER_BLOCKS_OT_stop_bridge,
+    BLENDER_BLOCKS_OT_dev_reload,
+    BLENDER_BLOCKS_OT_dev_reset,
+    BLENDER_BLOCKS_OT_dev_clear,
+    BLENDER_BLOCKS_OT_dev_dump,
+    BLENDER_BLOCKS_OT_dev_scene,
+    BLENDER_BLOCKS_PT_dev,
 )
 
 

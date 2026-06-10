@@ -1,7 +1,7 @@
 # Manual fonts
 
 The PDF manual uses **Mulish** (a friendly, lightly-rounded humanist sans) for its
-SnapBlock identity. `generate.py` loads these when present and falls back to Helvetica if
+Blender Blocks identity. `generate.py` loads these when present and falls back to Helvetica if
 they're missing, so the tool still runs without them.
 
 - `Mulish-Display.ttf` — weight 600, for headings / wordmark / badges

@@ -5,8 +5,8 @@ sequence of steps. It is the one source of truth shared by two independent progr
 
 - **the manual generator** (`manual/`, pure Python, no Blender) — reads a plan and renders
   a cute nanoblock-style PDF booklet.
-- **the in-Blender toy** (`snapblock/`, bpy) — reads the same plan (`snapblock/driver.py` +
-  the `snapblock.driver_*` operators / "Follow a Manual" panel) to drive the hand-build
+- **the in-Blender toy** (`blender_blocks/`, bpy) — reads the same plan (`blender_blocks/driver.py` +
+  the `blender_blocks.driver_*` operators / "Follow a Manual" panel) to drive the hand-build
   experience: current step, parts list, ghost hint, honor-system checkoff, bag-collections.
 
 Neither program imports the other. They agree only on this file format. That keeps the
@@ -48,7 +48,7 @@ Pipeline: `model.vox → vox_import → voxel model → planner → build plan �
 - `version` — format version. Currently `1`. Bump when the shape changes incompatibly.
 - `model.name` — display name, shown on the manual cover/header.
 - `grid.U`, `grid.H` — cell size on X/Y and height on Z, in Blender units. Mirrors
-  `snapblock/constants.py`. Carried in the plan so the generator stays self-contained.
+  `blender_blocks/constants.py`. Carried in the plan so the generator stays self-contained.
 - `palette` — maps a **material name** to an RGB triple in 0..1. The generator colors
   cubes from this; it does **not** read the add-on's color presets (decoupling). A plan
   is only valid if every block's `material` exists here.

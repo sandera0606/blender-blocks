@@ -1,9 +1,9 @@
-# SnapBlock — Blender Add-on Project Brief
+# Blender Blocks — Blender Add-on Project Brief
 
 ## Why this exists
 
 Building with snap-together blocks in Blender is fun. Tedious, but fun — and weirdly
-therapeutic. SnapBlock is a personal toy that takes that pastime and removes the
+therapeutic. Blender Blocks is a personal toy that takes that pastime and removes the
 tedium: pick a block, drop it on a grid, snap more next to it, color them in.
 
 It is built for my own use. There's no audience to teach and no learning curve to
@@ -14,7 +14,7 @@ behind a real, editable Blender scene I can keep tinkering with by hand.
 
 1. **Glass-box, not black-box.** Placed blocks are normal mesh objects with normal
    materials in a normal collection. No custom node graphs, no hidden state, no
-   proprietary data that breaks when the add-on is disabled. If I uninstall SnapBlock
+   proprietary data that breaks when the add-on is disabled. If I uninstall Blender Blocks
    tomorrow, the scene still works — and at any point I can drop the toy and keep
    editing the build by hand.
 2. **Stay on the grid.** Everything snaps. A build should always be cleanly aligned
@@ -36,7 +36,7 @@ behind a real, editable Blender scene I can keep tinkering with by hand.
   world `(gx, gy, gz)`. *(History: originally specced as 2mm-in-meters; on 2026-06-07
   switched to the blocks' native 2.0-BU scale, then halved to 1.0 BU/cell — far more
   viewable in Blender's default viewport.)*
-- **Block list:** see `snapblock/constants.py` → `BLOCK_TYPES` for the live catalogue
+- **Block list:** see `blender_blocks/constants.py` → `BLOCK_TYPES` for the live catalogue
   (1×1, 1×1 round, 2×1, 2×2, 3×1, 3×2, 4×1, 4×2, 4×2 smooth, 6×1, 8×2, Step, L-block,
   T-block, 10×2, 10×4, 10×8, 10×10, 20×10, 20×20).
 - **Not real LEGO proportions.** Custom geometry. Refer to them as "blocks" or "snap
@@ -51,7 +51,7 @@ strips materials — the original object is left untouched), and saves it. Remov
 the same panel and in Add-on prefs.
 
 - **Storage:** one `.blend` per custom block under Blender's per-user CONFIG dir
-  (`config/snapblock/custom_blocks/<type_id>.blend`), *outside* the package — so an
+  (`config/blender_blocks/custom_blocks/<type_id>.blend`), *outside* the package — so an
   add-on reinstall never wipes them. A lightweight pointer (display name + slug
   `type_id`) lives in `AddonPreferences.custom_blocks`; `prefs.iter_blocks()` is the one
   source of truth the panel reads (built-ins, then customs). This mirrors how custom
@@ -61,7 +61,7 @@ the same panel and in Add-on prefs.
   cells, since studs make a block stand a little over 1.0. Stud/height alignment with
   other blocks is the modeler's responsibility — glass-box, edit by hand as needed.
 - **Glass-box still holds:** a placed custom block is an ordinary appended mesh in
-  `SnapBlock Build`, the stored `.blend` is a normal file, and the prefs entry is only a
+  `Blender Blocks Build`, the stored `.blend` is a normal file, and the prefs entry is only a
   pointer.
 
 ### Pre-flight checklist for the blocks
@@ -78,7 +78,7 @@ the same panel and in Add-on prefs.
   block-type identifier when placed blocks are named `Block_<type>.<counter>`.
 
 **Important: never modify the source file directly.** The cleanup utility reads from
-`source_blocks/all_blocks.blend` and writes to `snapblock/snapblock_library.blend`. The
+`source_blocks/all_blocks.blend` and writes to `blender_blocks/blender_blocks_library.blend`. The
 source is the master copy and is sacred.
 
 The cleanup utility (run inside Blender's scripting tab — `bpy` is only available there):
@@ -98,7 +98,7 @@ The cleanup utility (run inside Blender's scripting tab — `bpy` is only availa
 4. Confirms dimensions are sensible multiples of the grid unit. Report any block whose
    dimensions don't cleanly divide.
 5. Strips any embedded materials (the color system applies materials at runtime).
-6. Writes the cleaned blocks into `snapblock/snapblock_library.blend` as a fresh asset
+6. Writes the cleaned blocks into `blender_blocks/blender_blocks_library.blend` as a fresh asset
    library.
 
 The utility prints a clear report at the end (blocks processed, origin/scale/dimension
@@ -108,7 +108,7 @@ results, materials stripped, output path).
 
 ### Grid system
 
-Constants live in `snapblock/constants.py`:
+Constants live in `blender_blocks/constants.py`:
 
 ```python
 U = 1.0  # grid cell size on X and Y, in Blender units (one cell = 1.0 BU)
@@ -121,13 +121,13 @@ and convert to world coordinates only when placing.
 
 ### Block storage (bundled assets)
 
-Ship the cleaned blocks in `snapblock_library.blend` inside the addon folder. Load on
+Ship the cleaned blocks in `blender_blocks_library.blend` inside the addon folder. Load on
 demand with `bpy.data.libraries.load()` — append (not link) so each placed block is its
 own editable copy of the mesh data.
 
 ### Placement flow
 
-1. Click a block button in the SnapBlock side panel (N-panel, category "SnapBlock").
+1. Click a block button in the Blender Blocks side panel (N-panel, category "Blender Blocks").
 2. The add-on appends that block from the library at the 3D cursor, snapped to the
    nearest grid cell.
 3. The new block is auto-selected, and grid snapping is enabled so a follow-up G-drag
@@ -151,7 +151,7 @@ and fighting that keymap causes more trouble than it's worth.
 `Block_<type>.<counter>` — e.g. `Block_2x4.001`, `Block_T.001`. This is what shows in
 the Outliner. Keep it readable.
 
-All placed blocks go into a collection called `SnapBlock Build` — clean grouping in the
+All placed blocks go into a collection called `Blender Blocks Build` — clean grouping in the
 Outliner.
 
 ### Color system
@@ -159,7 +159,7 @@ Outliner.
 A "Colors" panel section with preset swatches (see `constants.COLOR_PRESETS`: white,
 black, red, orange, yellow, green, blue, gray). Clicking a swatch with blocks selected:
 
-1. Creates (or reuses) a material named `SnapBlock_<colorname>` with that base color, a
+1. Creates (or reuses) a material named `BlenderBlocks_<colorname>` with that base color, a
    plastic-ish roughness (~0.4), and a touch of subsurface.
 2. Assigns it to the selected blocks.
 3. Shows a status message naming the material and where to find it.
@@ -169,13 +169,13 @@ Materials are real Blender materials — Principled BSDF only, no custom shader 
 ## File structure
 
 ```
-snapblock/
+blender_blocks/
 ├── __init__.py          # Addon registration, bl_info
 ├── constants.py         # U, H, color presets, block catalogue
 ├── operators.py         # bpy.types.Operator subclasses (add_block, apply_color, nudge, rotate, delete)
 ├── panels.py            # bpy.types.Panel subclasses (main panel + subpanels)
-├── library.py           # Block loading from snapblock_library.blend
-└── snapblock_library.blend  # Bundled block assets
+├── library.py           # Block loading from blender_blocks_library.blend
+└── blender_blocks_library.blend  # Bundled block assets
 ```
 
 ## Blender API concepts the code uses
@@ -187,7 +187,7 @@ snapblock/
 - `bpy.props` — operator properties (which block, which color, nudge axis, etc.).
 - `bpy.data.libraries.load()` — appending blocks from the bundled .blend.
 - `bpy.context.scene.tool_settings` — for forcing grid snap on.
-- `bpy.types.Collection` — for the SnapBlock Build collection.
+- `bpy.types.Collection` — for the Blender Blocks Build collection.
 - Standard `register()` / `unregister()` pattern in `__init__.py`.
 
 ## Compatibility target
@@ -200,7 +200,7 @@ snapblock/
 
 1. Block-cleanup utility (origin verification, scale check, material stripping,
    dimension audit) targeting `source_blocks/all_blocks.blend` →
-   `snapblock/snapblock_library.blend`. Run it in Blender and read the report before
+   `blender_blocks/blender_blocks_library.blend`. Run it in Blender and read the report before
    proceeding.
 2. Resolve any discrepancies the report flags.
 3. Scaffold the addon folder with a working `bl_info` / `register()` / `unregister()`.
@@ -226,7 +226,7 @@ right now. Add one if it does.
 
 Friendly, plain English, never condescending, no Python jargon. Examples:
 
-- ✅ "Added a 2×4 block — a normal mesh object in the 'SnapBlock Build' collection."
+- ✅ "Added a 2×4 block — a normal mesh object in the 'Blender Blocks Build' collection."
 - ❌ "Brick added successfully!"
 - ❌ "Initialized bpy.types.Object with mesh data from library."
 

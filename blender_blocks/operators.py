@@ -1,18 +1,18 @@
 """
-SnapBlock operators — one bpy.types.Operator per user action.
+Blender Blocks operators — one bpy.types.Operator per user action.
 
-  - SNAPBLOCK_OT_add_block:       append a block from the library at the snapped cursor.
-  - SNAPBLOCK_OT_apply_material:  give the selected blocks a material (preset or custom).
-  - SNAPBLOCK_OT_add_material:    make a custom material and save it to the library.
-  - SNAPBLOCK_OT_add_material_from_existing: capture an existing material into the library.
-  - SNAPBLOCK_OT_remove_material: drop a custom material from the library.
-  - SNAPBLOCK_OT_nudge:           move the selected blocks by whole grid cells.
-  - SNAPBLOCK_OT_rotate:          turn the selected blocks 90° about Z, staying on grid.
-  - SNAPBLOCK_OT_delete:          remove the selected blocks from the scene.
+  - BLENDER_BLOCKS_OT_add_block:       append a block from the library at the snapped cursor.
+  - BLENDER_BLOCKS_OT_apply_material:  give the selected blocks a material (preset or custom).
+  - BLENDER_BLOCKS_OT_add_material:    make a custom material and save it to the library.
+  - BLENDER_BLOCKS_OT_add_material_from_existing: capture an existing material into the library.
+  - BLENDER_BLOCKS_OT_remove_material: drop a custom material from the library.
+  - BLENDER_BLOCKS_OT_nudge:           move the selected blocks by whole grid cells.
+  - BLENDER_BLOCKS_OT_rotate:          turn the selected blocks 90° about Z, staying on grid.
+  - BLENDER_BLOCKS_OT_delete:          remove the selected blocks from the scene.
 
 bpy note: every user action in Blender is a bpy.types.Operator. The class needs
 a unique bl_idname in the form "category.action" (lowercase, one dot); that's the
-string the UI calls via layout.operator("snapblock.add_block").
+string the UI calls via layout.operator("blender_blocks.add_block").
 """
 
 import math
@@ -23,10 +23,10 @@ from mathutils import Matrix, Vector
 from . import constants, driver, library, prefs
 
 
-class SNAPBLOCK_OT_add_block(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_add_block(bpy.types.Operator):
     """Append one block from the bundled library and place it at the 3D cursor,
-    snapped to the grid, inside the 'SnapBlock Build' collection."""
-    bl_idname = "snapblock.add_block"
+    snapped to the grid, inside the 'Blender Blocks Build' collection."""
+    bl_idname = "blender_blocks.add_block"
     bl_label = "Add block"
     bl_description = "Add this block at the 3D cursor, snapped to the grid"
     bl_options = {'REGISTER', 'UNDO'}   # show in the redo panel + hook Blender's native undo
@@ -43,7 +43,7 @@ class SNAPBLOCK_OT_add_block(bpy.types.Operator):
             obj = library.append_block(self.type_id)
         except FileNotFoundError:
             self.report({'ERROR'},
-                        "Couldn't find the block library that ships with SnapBlock. "
+                        "Couldn't find the block library that ships with Blender Blocks. "
                         "Try reinstalling the add-on.")
             return {'CANCELLED'}
         except ValueError:
@@ -105,13 +105,13 @@ def _whole_cells(value, cell_size):
     return None
 
 
-class SNAPBLOCK_OT_add_block_from_selection(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_add_block_from_selection(bpy.types.Operator):
     """Capture the active object as a new block in your library, so it shows up as a
-    button in every file. SnapBlock makes a clean copy: it bakes in the object's
+    button in every file. Blender Blocks makes a clean copy: it bakes in the object's
     rotation/scale, moves the origin to the bottom corner, and drops its materials —
     your original object is left untouched. The footprint must be a whole number of
     cells so the block snaps to the grid."""
-    bl_idname = "snapblock.add_block_from_selection"
+    bl_idname = "blender_blocks.add_block_from_selection"
     bl_label = "Add block from selection"
     bl_description = "Capture the active object as a custom block in your library"
     bl_options = {'REGISTER', 'UNDO'}
@@ -210,16 +210,16 @@ class SNAPBLOCK_OT_add_block_from_selection(bpy.types.Operator):
 
         self.report({'INFO'},
                     "Added block '{}' ({}×{} cells) — it's now a button in the Blocks "
-                    "panel. Studs and height are up to you; SnapBlock only checks the "
+                    "panel. Studs and height are up to you; Blender Blocks only checks the "
                     "footprint.".format(name, cells_x, cells_y))
         return {'FINISHED'}
 
 
-class SNAPBLOCK_OT_remove_block(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_remove_block(bpy.types.Operator):
     """Remove one of your custom blocks from the library, deleting its stored .blend.
     The built-in blocks can't be removed. Blocks you already placed in the scene stay
     — they're normal mesh objects."""
-    bl_idname = "snapblock.remove_block"
+    bl_idname = "blender_blocks.remove_block"
     bl_label = "Remove block"
     bl_description = "Remove this custom block from your library"
     bl_options = {'REGISTER'}   # preferences aren't part of Blender's undo stack
@@ -249,7 +249,7 @@ class SNAPBLOCK_OT_remove_block(bpy.types.Operator):
 
 
 def _get_or_create_material(name, rgb, roughness, opacity, transmission):
-    """Return the shared 'SnapBlock_<name>' material, creating it once if needed.
+    """Return the shared 'BlenderBlocks_<name>' material, creating it once if needed.
     One material per name, reused across every block that uses it.
 
     Principled BSDF only (no custom node graph). bpy note: modern materials are
@@ -295,10 +295,10 @@ def _get_or_create_material(name, rgb, roughness, opacity, transmission):
     return mat
 
 
-class SNAPBLOCK_OT_apply_material(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_apply_material(bpy.types.Operator):
     """Give the selected blocks a material — a preset or one of your custom ones —
     as a real Blender material."""
-    bl_idname = "snapblock.apply_material"
+    bl_idname = "blender_blocks.apply_material"
     bl_label = "Apply material"
     bl_description = "Give the selected blocks this material"
     bl_options = {'REGISTER', 'UNDO'}
@@ -352,12 +352,12 @@ _FINISH_ENUM_ITEMS = tuple(
 _FINISH_LOOKUP = {pid: (r, o, t) for pid, _label, r, o, t in constants.FINISH_PRESETS}
 
 
-class SNAPBLOCK_OT_add_material(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_add_material(bpy.types.Operator):
     """Make a custom material (name + color + finish) and save it to your library,
     so it shows up as a swatch in every file. The finish preset sets the
     roughness/opacity/transmission; to capture a fully custom look, build a material
     in the shader editor and use 'Add from material' instead."""
-    bl_idname = "snapblock.add_material"
+    bl_idname = "blender_blocks.add_material"
     bl_label = "Add material"
     bl_description = "Create a custom material and add it to your library"
     bl_options = {'REGISTER', 'UNDO'}
@@ -403,7 +403,7 @@ class SNAPBLOCK_OT_add_material(bpy.types.Operator):
         item.transmission = transmission
 
         # Persist to disk so the material is there next session, even if Blender's
-        # "Auto-Save Preferences" is off. This is the one place SnapBlock writes the
+        # "Auto-Save Preferences" is off. This is the one place Blender Blocks writes the
         # global user preferences.
         bpy.ops.wm.save_userpref()
 
@@ -416,10 +416,10 @@ class SNAPBLOCK_OT_add_material(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SNAPBLOCK_OT_remove_material(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_remove_material(bpy.types.Operator):
     """Remove one of your custom materials from the library. The built-in color
     presets can't be removed."""
-    bl_idname = "snapblock.remove_material"
+    bl_idname = "blender_blocks.remove_material"
     bl_label = "Remove material"
     bl_description = "Remove this custom material from your library"
     bl_options = {'REGISTER'}   # preferences aren't part of Blender's undo stack
@@ -464,7 +464,7 @@ def _read_principled(mat):
 
 def _on_source_change(self, context):
     """When the source material is picked, default the library name to it (minus our
-    SnapBlock_ prefix) — but only if the user hasn't typed their own name yet."""
+    BlenderBlocks_ prefix) — but only if the user hasn't typed their own name yet."""
     mat = bpy.data.materials.get(self.source_name)
     if mat is not None and not self.name:
         n = mat.name
@@ -473,13 +473,13 @@ def _on_source_change(self, context):
         self.name = n
 
 
-class SNAPBLOCK_OT_add_material_from_existing(bpy.types.Operator):
-    """Add one of this file's existing materials to your SnapBlock library by reading
+class BLENDER_BLOCKS_OT_add_material_from_existing(bpy.types.Operator):
+    """Add one of this file's existing materials to your Blender Blocks library by reading
     its Principled BSDF (color, roughness, opacity, transmission). The handy way to
     capture a fully custom look: build it in the shader editor, then grab it here."""
-    bl_idname = "snapblock.add_material_from_existing"
+    bl_idname = "blender_blocks.add_material_from_existing"
     bl_label = "Add from material"
-    bl_description = "Copy an existing material in this file into your SnapBlock library"
+    bl_description = "Copy an existing material in this file into your Blender Blocks library"
     bl_options = {'REGISTER', 'UNDO'}
 
     source_name: bpy.props.StringProperty(name="Material", update=_on_source_change)
@@ -536,10 +536,10 @@ class SNAPBLOCK_OT_add_material_from_existing(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SNAPBLOCK_OT_nudge(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_nudge(bpy.types.Operator):
     """Move the selected blocks by whole grid cells, so they always stay aligned
     to the grid — unlike a free G-drag, which can drift to a fraction of a cell."""
-    bl_idname = "snapblock.nudge"
+    bl_idname = "blender_blocks.nudge"
     bl_label = "Nudge block"
     bl_description = "Move the selected blocks one cell along the grid"
     bl_options = {'REGISTER', 'UNDO'}
@@ -629,10 +629,10 @@ def _rotate_obj_about_center(obj, steps, context):
     _snap_to_grid(obj, context)
 
 
-class SNAPBLOCK_OT_rotate(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_rotate(bpy.types.Operator):
     """Turn the selected blocks 90° around the up (Z) axis, pivoting about each
     block's own footprint center so it spins in place and stays on the grid."""
-    bl_idname = "snapblock.rotate"
+    bl_idname = "blender_blocks.rotate"
     bl_label = "Rotate block"
     bl_description = "Turn the selected blocks 90° around the up axis"
     bl_options = {'REGISTER', 'UNDO'}
@@ -661,9 +661,9 @@ class SNAPBLOCK_OT_rotate(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SNAPBLOCK_OT_delete(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_delete(bpy.types.Operator):
     """Remove the selected blocks from the scene entirely."""
-    bl_idname = "snapblock.delete"
+    bl_idname = "blender_blocks.delete"
     bl_label = "Delete block"
     bl_description = "Remove the selected blocks from the scene"
     bl_options = {'REGISTER', 'UNDO'}
@@ -697,7 +697,7 @@ class SNAPBLOCK_OT_delete(bpy.types.Operator):
 # helpers above (ghost rendering) live here.
 
 def _ghost_material():
-    """The shared translucent 'SnapBlock_Ghost' material for hint previews."""
+    """The shared translucent 'BlenderBlocks_Ghost' material for hint previews."""
     return _get_or_create_material(
         constants.GHOST_MATERIAL, constants.GHOST_COLOR,
         constants.MATERIAL_ROUGHNESS, constants.GHOST_OPACITY, 0.0,
@@ -772,10 +772,10 @@ def _build_ghosts(context, step):
     return placed
 
 
-class SNAPBLOCK_OT_driver_load(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_driver_load(bpy.types.Operator):
     """Open a build-plan JSON and follow it step by step. Pre-creates one collection per
-    bag under 'SnapBlock Build'; blocks you place are sorted into the current bag."""
-    bl_idname = "snapblock.driver_load"
+    bag under 'Blender Blocks Build'; blocks you place are sorted into the current bag."""
+    bl_idname = "blender_blocks.driver_load"
     bl_label = "Load build plan"
     bl_description = "Open a build-plan JSON and follow it step by step"
     bl_options = {'REGISTER'}   # navigation/state, not part of Blender's modeling undo
@@ -797,7 +797,7 @@ class SNAPBLOCK_OT_driver_load(bpy.types.Operator):
             return {'CANCELLED'}
 
         driver.invalidate_cache(self.filepath)   # force a fresh read on the next get_plan
-        state = context.scene.snapblock_driver
+        state = context.scene.blender_blocks_driver
         state.plan_filepath = self.filepath
         state.model_name = (plan.get("model") or {}).get("name", "Untitled")
         state.global_index = 0
@@ -820,10 +820,10 @@ class SNAPBLOCK_OT_driver_load(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SNAPBLOCK_OT_driver_goto(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_driver_goto(bpy.types.Operator):
     """Move to another step. One parameterised operator: Prev/Next use `delta`, a jump
     uses `absolute` (>= 0)."""
-    bl_idname = "snapblock.driver_goto"
+    bl_idname = "blender_blocks.driver_goto"
     bl_label = "Go to step"
     bl_description = "Move to another step in the manual"
     bl_options = {'REGISTER'}
@@ -832,7 +832,7 @@ class SNAPBLOCK_OT_driver_goto(bpy.types.Operator):
     absolute: bpy.props.IntProperty(default=-1)   # -1 = use delta; >= 0 = jump there
 
     def execute(self, context):
-        state = context.scene.snapblock_driver
+        state = context.scene.blender_blocks_driver
         plan = driver.get_plan(state.plan_filepath)
         if plan is None:
             self.report({'ERROR'}, "Load a build plan first.")
@@ -852,10 +852,10 @@ class SNAPBLOCK_OT_driver_goto(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SNAPBLOCK_OT_driver_toggle_check(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_driver_toggle_check(bpy.types.Operator):
     """Tick a step off (or back on) — honor-system, no scene-checking. Defaults to the
     current step."""
-    bl_idname = "snapblock.driver_toggle_check"
+    bl_idname = "blender_blocks.driver_toggle_check"
     bl_label = "Mark step done"
     bl_description = "Tick this step off as done (honor system)"
     bl_options = {'REGISTER'}
@@ -863,22 +863,22 @@ class SNAPBLOCK_OT_driver_toggle_check(bpy.types.Operator):
     index: bpy.props.IntProperty(default=-1)   # -1 = the current step
 
     def execute(self, context):
-        state = context.scene.snapblock_driver
+        state = context.scene.blender_blocks_driver
         idx = self.index if self.index >= 0 else state.global_index
         driver.toggle_checked(state, idx)
         return {'FINISHED'}
 
 
-class SNAPBLOCK_OT_driver_toggle_ghost(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_driver_toggle_ghost(bpy.types.Operator):
     """Show or hide the 👻 ghost hint — translucent preview copies of the current step's
     blocks at their target cells, for when you're stuck."""
-    bl_idname = "snapblock.driver_toggle_ghost"
+    bl_idname = "blender_blocks.driver_toggle_ghost"
     bl_label = "Ghost hint"
     bl_description = "Show translucent previews of this step's blocks where they go"
     bl_options = {'REGISTER'}
 
     def execute(self, context):
-        state = context.scene.snapblock_driver
+        state = context.scene.blender_blocks_driver
         plan = driver.get_plan(state.plan_filepath)
         if plan is None:
             self.report({'ERROR'}, "Load a build plan first.")
@@ -897,17 +897,17 @@ class SNAPBLOCK_OT_driver_toggle_ghost(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SNAPBLOCK_OT_driver_clear(bpy.types.Operator):
+class BLENDER_BLOCKS_OT_driver_clear(bpy.types.Operator):
     """Close the manual: clear the current-step/checkoff state and any ghost hint. The
     bag collections and the blocks you built stay — they're your scene."""
-    bl_idname = "snapblock.driver_clear"
+    bl_idname = "blender_blocks.driver_clear"
     bl_label = "Close manual"
     bl_description = "Stop following the manual (keeps your built blocks and bags)"
     bl_options = {'REGISTER'}
 
     def execute(self, context):
         _clear_ghosts(context)
-        state = context.scene.snapblock_driver
+        state = context.scene.blender_blocks_driver
         state.plan_filepath = ""
         state.model_name = ""
         state.global_index = 0
@@ -921,19 +921,19 @@ class SNAPBLOCK_OT_driver_clear(bpy.types.Operator):
 # registration. Order matters: classes a panel references must register first,
 # which is why operators register before panels.
 classes = (
-    SNAPBLOCK_OT_add_block,
-    SNAPBLOCK_OT_add_block_from_selection,
-    SNAPBLOCK_OT_remove_block,
-    SNAPBLOCK_OT_apply_material,
-    SNAPBLOCK_OT_add_material,
-    SNAPBLOCK_OT_add_material_from_existing,
-    SNAPBLOCK_OT_remove_material,
-    SNAPBLOCK_OT_nudge,
-    SNAPBLOCK_OT_rotate,
-    SNAPBLOCK_OT_delete,
-    SNAPBLOCK_OT_driver_load,
-    SNAPBLOCK_OT_driver_goto,
-    SNAPBLOCK_OT_driver_toggle_check,
-    SNAPBLOCK_OT_driver_toggle_ghost,
-    SNAPBLOCK_OT_driver_clear,
+    BLENDER_BLOCKS_OT_add_block,
+    BLENDER_BLOCKS_OT_add_block_from_selection,
+    BLENDER_BLOCKS_OT_remove_block,
+    BLENDER_BLOCKS_OT_apply_material,
+    BLENDER_BLOCKS_OT_add_material,
+    BLENDER_BLOCKS_OT_add_material_from_existing,
+    BLENDER_BLOCKS_OT_remove_material,
+    BLENDER_BLOCKS_OT_nudge,
+    BLENDER_BLOCKS_OT_rotate,
+    BLENDER_BLOCKS_OT_delete,
+    BLENDER_BLOCKS_OT_driver_load,
+    BLENDER_BLOCKS_OT_driver_goto,
+    BLENDER_BLOCKS_OT_driver_toggle_check,
+    BLENDER_BLOCKS_OT_driver_toggle_ghost,
+    BLENDER_BLOCKS_OT_driver_clear,
 )

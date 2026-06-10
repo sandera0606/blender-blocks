@@ -6,8 +6,8 @@ __pycache__/
 *.blend1
 *.blend2
 
-# Build artifact (regenerate from snapblock/ source)
-snapblock.zip
+# Build artifact (regenerate from blender_blocks/ source)
+blender_blocks.zip
 
 # Captured script output
 tools/audit_blocks_output.txt

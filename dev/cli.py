@@ -2,14 +2,14 @@ r"""Run dev actions against the live Blender session from a terminal.
 
 Sends one request to the dev bridge socket and prints the reply. Same wire
 protocol as the MCP server, no MCP involved. Needs Blender open with the bridge
-started (N-panel > SnapBlock Dev > Start Bridge Server, port 9876).
+started (N-panel > Blender Blocks Dev > Start Bridge Server, port 9876).
 
 Usage (from the repo root):
-    py dev\cli.py reload [MODULE]      reload the add-on (default: snapblock)
+    py dev\cli.py reload [MODULE]      reload the add-on (default: blender_blocks)
     py dev\cli.py reset [--force]      empty scene (File > New, no cube)
     py dev\cli.py dump [PATH]          list a .blend's contents (default: source library)
     py dev\cli.py scene               objects / collections / materials
-    py dev\cli.py clear [COLLECTION]   clear a preview collection (default: SnapBlock Preview)
+    py dev\cli.py clear [COLLECTION]   clear a preview collection (default: Blender Blocks Preview)
     py dev\cli.py py "CODE"            run bpy code
 
 Stdlib only, so any Python runs it; no .venv or mcp package needed.
@@ -45,7 +45,7 @@ def _call(tool, args):
             "ok": False,
             "error": (
                 "Couldn't reach the Blender bridge on {}:{}. Is Blender open with the "
-                "bridge started? (N-panel > SnapBlock Dev > Start Bridge Server)"
+                "bridge started? (N-panel > Blender Blocks Dev > Start Bridge Server)"
             ).format(HOST, PORT),
         }
 
@@ -71,7 +71,7 @@ def main(argv):
         return 0
     cmd, rest = argv[0], argv[1:]
     if cmd == "reload":
-        tool, args = "reload_addon", {"module": rest[0] if rest else "snapblock"}
+        tool, args = "reload_addon", {"module": rest[0] if rest else "blender_blocks"}
     elif cmd == "reset":
         tool, args = "reset_scene", {"force": "--force" in rest}
     elif cmd == "dump":
@@ -80,7 +80,7 @@ def main(argv):
     elif cmd == "scene":
         tool, args = "get_scene_summary", {}
     elif cmd == "clear":
-        tool, args = "clear_preview", {"collection": rest[0] if rest else "SnapBlock Preview"}
+        tool, args = "clear_preview", {"collection": rest[0] if rest else "Blender Blocks Preview"}
     elif cmd == "py":
         if not rest:
             print('Usage: py dev\\cli.py py "CODE"')

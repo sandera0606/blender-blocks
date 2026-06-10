@@ -5,7 +5,7 @@ Usage:
     python -m manual.generate manual/samples/house.json
     python -m manual.generate manual/samples/house.json -o house_manual.pdf
 
-Layout (modelled on the reference booklets in ./references/), with a soft SnapBlock
+Layout (modelled on the reference booklets in ./references/), with a soft Blender Blocks
 identity layered on top — warm cream paper, a slim rounded typeface, muted pastels, and
 little sparkles:
   - a cover page: a wordmark, the model name, a hero diagram on a soft ground shadow, and
@@ -53,7 +53,7 @@ WHITE = (1.0, 1.0, 1.0)
 ACCENT = (0.70, 0.45, 0.44)     # muted clay rose — the one restrained accent
 ACCENT_SOFT = (0.82, 0.62, 0.60)
 
-WORDMARK = "snapblock"
+WORDMARK = "blender blocks"
 
 # Fonts: filled in by _register_fonts(); Helvetica is the graceful fallback.
 F_DISPLAY = "Helvetica-Bold"

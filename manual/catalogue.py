@@ -1,7 +1,7 @@
 """
 The rectangular block catalogue, for the planner and renderer.
 
-DUPLICATED ON PURPOSE: the source of truth is `snapblock/constants.py:BLOCK_TYPES`,
+DUPLICATED ON PURPOSE: the source of truth is `blender_blocks/constants.py:BLOCK_TYPES`,
 but `manual/` can't import it (that package imports `bpy`, which only exists inside
 Blender). So we keep the rectangular subset here, in sync by hand. Non-rectangular
 blocks (round / smooth / step / L / T) are intentionally excluded — the merger only

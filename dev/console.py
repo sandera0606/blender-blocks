@@ -1,14 +1,14 @@
 r"""Dev-loop helpers for Blender's Python console.
 
 Thin wrappers over the bridge's tool_* functions, called in-process. They work
-whenever the SnapBlock Dev Bridge add-on is enabled; you don't need to Start
+whenever the Blender Blocks Dev Bridge add-on is enabled; you don't need to Start
 Bridge Server, since the console already runs on the main thread.
 
 To load, paste these two lines into the console (point the first at your checkout).
 The exec drops every function into the console namespace:
 
-    SNAPBLOCK_REPO = r"C:\Users\shuan\Documents\personal\Coding\snapblock"
-    exec(open(SNAPBLOCK_REPO + r"\dev\console.py").read())
+    BLENDER_BLOCKS_REPO = r"C:\Users\shuan\Documents\personal\Coding\snapblock"
+    exec(open(BLENDER_BLOCKS_REPO + r"\dev\console.py").read())
 
 Then call reload(), reset(), dump(), scene(), clear(), py("..."), or helpme().
 """
@@ -20,14 +20,14 @@ try:
     import blender_bridge as _bridge
 except ImportError:
     raise RuntimeError(
-        "Can't import the SnapBlock Dev Bridge add-on. Enable it in "
-        "Edit > Preferences > Add-ons (search 'SnapBlock Dev Bridge'), then reload this."
+        "Can't import the Blender Blocks Dev Bridge add-on. Enable it in "
+        "Edit > Preferences > Add-ons (search 'Blender Blocks Dev Bridge'), then reload this."
     )
 
-# SNAPBLOCK_REPO comes from the loader line (exec shares our namespace). Fall back
+# BLENDER_BLOCKS_REPO comes from the loader line (exec shares our namespace). Fall back
 # to the cwd if it wasn't set.
 try:
-    _REPO = SNAPBLOCK_REPO  # noqa: F821 - provided by the loader
+    _REPO = BLENDER_BLOCKS_REPO  # noqa: F821 - provided by the loader
 except NameError:
     _REPO = os.getcwd()
 
@@ -49,8 +49,8 @@ def _show(reply):
         print(reply["error"].rstrip())
 
 
-def reload(module="snapblock"):
-    """Reload the snapblock package from your working tree (apply file edits)."""
+def reload(module="blender_blocks"):
+    """Reload the blender_blocks package from your working tree (apply file edits)."""
     _show(_bridge.tool_reload_addon({"module": module}))
 
 
@@ -69,7 +69,7 @@ def scene():
     _show(_bridge.tool_get_scene_summary({}))
 
 
-def clear(collection="SnapBlock Preview"):
+def clear(collection="Blender Blocks Preview"):
     """Remove a preview collection and the meshes/materials it brought in."""
     _show(_bridge.tool_clear_preview({"collection": collection}))
 
@@ -82,15 +82,15 @@ def py(code):
 def helpme():
     """List the commands. Named helpme to avoid shadowing builtin help."""
     print(
-        "SnapBlock dev console:\n"
-        "  reload()            reload the snapblock add-on from the working tree\n"
+        "Blender Blocks dev console:\n"
+        "  reload()            reload the blender_blocks add-on from the working tree\n"
         "  reset(force=False)  empty scene for clean appends\n"
         "  dump(path=None)     list a .blend's contents (default: source library)\n"
         "  scene()             objects / collections / materials\n"
-        "  clear()             remove the SnapBlock Preview collection\n"
+        "  clear()             remove the Blender Blocks Preview collection\n"
         "  py('code')          run bpy code\n"
         "  helpme()            this list"
     )
 
 
-print("SnapBlock dev console loaded. Type helpme() for commands.")
+print("Blender Blocks dev console loaded. Type helpme() for commands.")

@@ -1,8 +1,8 @@
 """
-SnapBlock — build the cleaned block library.
+Blender Blocks — build the cleaned block library.
 
 Run this inside Blender's Scripting tab. It reads your master library, makes a
-*clean copy* of every block, and writes it to snapblock/snapblock_library.blend.
+*clean copy* of every block, and writes it to blender_blocks/blender_blocks_library.blend.
 
 It NEVER modifies source_blocks/all_blocks.blend and NEVER saves your session.
 Think of it as "make a copy and fix the copy" — the copy is the .blend it writes.
@@ -19,12 +19,12 @@ What it does to each block (on the appended copy, in memory):
      authored at 2.0 BU/cell, but Blender's native grid and increment-snap step
      by 1.0, so halving makes one cell line up with one native unit — a placed
      block at cell (3,0) then sits at world (3,0), and snap-dragging lands on
-     whole cells. (Must match U=H=1.0 in snapblock/constants.py.)
+     whole cells. (Must match U=H=1.0 in blender_blocks/constants.py.)
 
 HOW TO RUN
   1. Open Blender 4.2+ and do File > New (a throwaway scene).
   2. Scripting tab > Text > Open > pick this file (so __file__ resolves) > Run.
-  3. Read the printed report. Confirm snapblock/snapblock_library.blend was written.
+  3. Read the printed report. Confirm blender_blocks/blender_blocks_library.blend was written.
   4. Close Blender WITHOUT saving.
 """
 
@@ -40,9 +40,9 @@ import os
 try:
     REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 except NameError:
-    REPO = ""   # e.g. r"D:\code\snapblock" — only needed if you pasted the script
+    REPO = ""   # e.g. r"D:\code\blender_blocks" — only needed if you pasted the script
 SOURCE_PATH = os.path.join(REPO, "source_blocks", "all_blocks.blend")
-OUTPUT_PATH = os.path.join(REPO, "snapblock", "snapblock_library.blend")
+OUTPUT_PATH = os.path.join(REPO, "blender_blocks", "blender_blocks_library.blend")
 
 COLLECTION_NAME = "blocks"
 
@@ -131,7 +131,7 @@ def clean_type_name(src_name):
 
 def main():
     print("\n" + "=" * 64)
-    print("SnapBlock library build")
+    print("Blender Blocks library build")
     print("Source:", SOURCE_PATH)
     print("Output:", OUTPUT_PATH)
     print("=" * 64)

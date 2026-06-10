@@ -1,7 +1,7 @@
 """
-SnapBlock — view the cleaned library (throwaway viewer).
+Blender Blocks — view the cleaned library (throwaway viewer).
 
-snapblock_library.blend is a parts bin: the blocks live in it as loose
+blender_blocks_library.blend is a parts bin: the blocks live in it as loose
 datablocks, NOT linked to any scene, so opening the file shows an empty
 viewport. This script appends them all into the current scene and lays them
 out in a row on the floor so you can look at each one.
@@ -22,8 +22,8 @@ import os
 try:
     REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 except NameError:
-    REPO = ""   # e.g. r"D:\code\snapblock" — only needed if you pasted the script
-LIBRARY_PATH = os.path.join(REPO, "snapblock", "snapblock_library.blend")
+    REPO = ""   # e.g. r"D:\code\blender_blocks" — only needed if you pasted the script
+LIBRARY_PATH = os.path.join(REPO, "blender_blocks", "blender_blocks_library.blend")
 GAP = 1.0   # space between blocks, in Blender units (one grid cell)
 
 

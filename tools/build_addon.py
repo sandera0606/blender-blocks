@@ -1,9 +1,9 @@
 """
-SnapBlock — build the installable add-on zip.
+Blender Blocks — build the installable add-on zip.
 
     python tools/build_addon.py
 
-Packages the snapblock/ package folder into snapblock.zip at the repo root.
+Packages the blender_blocks/ package folder into blender_blocks.zip at the repo root.
 """
 
 import os
@@ -12,8 +12,8 @@ import zipfile
 # Repo root is derived from this script's location (tools/ is one level down), so
 # it works wherever the repo is cloned, regardless of the current directory.
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PACKAGE_DIR = os.path.join(REPO, "snapblock")
-OUTPUT_ZIP = os.path.join(REPO, "snapblock.zip")
+PACKAGE_DIR = os.path.join(REPO, "blender_blocks")
+OUTPUT_ZIP = os.path.join(REPO, "blender_blocks.zip")
 
 # Files/dirs we never want in a shipped add-on.
 EXCLUDE_DIRS = {"__pycache__"}
@@ -22,7 +22,7 @@ EXCLUDE_SUFFIXES = (".pyc",)
 
 def _included_files():
     """Walk the package and yield (absolute_path, archive_name) for every file
-    that belongs in the zip. archive_name keeps the leading 'snapblock/' and uses
+    that belongs in the zip. archive_name keeps the leading 'blender_blocks/' and uses
     forward slashes so the zip is valid on every OS."""
     for dirpath, dirnames, filenames in os.walk(PACKAGE_DIR):
         # Prune excluded directories in place so os.walk doesn't descend into them.
@@ -53,8 +53,8 @@ def main():
     print("{} files, {:.0f} KB".format(len(files), os.path.getsize(OUTPUT_ZIP) / 1024))
 
     # Warning if block library isn't included
-    if not any(name.endswith("snapblock_library.blend") for _a, name in files):
-        print("\nWARNING: snapblock_library.blend is not in the package — "
+    if not any(name.endswith("blender_blocks_library.blend") for _a, name in files):
+        print("\nWARNING: blender_blocks_library.blend is not in the package — "
               "blocks won't load. Run tools/build_library.py first.")
 
 

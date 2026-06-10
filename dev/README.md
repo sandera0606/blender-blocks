@@ -1,18 +1,18 @@
-# SnapBlock Dev Bridge (MCP)
+# Blender Blocks Dev Bridge (MCP)
 
 Dev-only tooling that lets Claude Code run `bpy` directly inside your live
-Blender session — no more copy-paste loop. **Not part of the SnapBlock add-on.**
+Blender session — no more copy-paste loop. **Not part of the Blender Blocks add-on.**
 Keep it out of any shipped zip.
 
-## About SnapBlock
+## About Blender Blocks
 
-SnapBlock is a **Blender 4.2+ add-on** — a personal snap-block toy on top of a
+Blender Blocks is a **Blender 4.2+ add-on** — a personal snap-block toy on top of a
 real Blender scene. Place blocks on a grid, color them, and end up with normal
 Blender objects, materials, and collections you can keep editing by hand.
 Glass-box by design: nothing is faked or hidden, so the scene survives without
 the add-on.
 
-See `SNAPBLOCK_BRIEF.md` (repo root) for the full design and `CLAUDE.md` for the
+See `BLENDER_BLOCKS_BRIEF.md` (repo root) for the full design and `CLAUDE.md` for the
 working rules — notably: the block library in `source_blocks/all_blocks.blend`
 is **read-only**, and the blocks are called "blocks," not "LEGO" or "bricks."
 
@@ -47,16 +47,16 @@ more than a one-liner.
 | `run_python`              | Run arbitrary code with `bpy` in scope; stdout + tracebacks return as data. Set `result = ...` to also get its repr. |
 | `get_scene_summary`       | Objects (name/type/location/collections), collections, materials. |
 | `dump_library_state`      | List a `.blend`'s contents without appending. Defaults to the read-only `source_blocks/all_blocks.blend`. |
-| `get_viewport_screenshot` | Render the live 3D viewport to an image. Used only when a check is genuinely visual. `frame=True` points the view at the `SnapBlock Preview`/`target` collection (else frames all) first. |
-| `reload_addon`            | Re-import the `snapblock` package from the repo tree and re-run `register()`, so file edits apply with no zip rebuild/reinstall. Failed registration returns as a traceback, not a crash. |
-| `clear_preview`           | Remove a `SnapBlock Preview` collection and the meshes/materials it brought in (only those that drop to 0 users), reverting a preview cleanly. |
+| `get_viewport_screenshot` | Render the live 3D viewport to an image. Used only when a check is genuinely visual. `frame=True` points the view at the `Blender Blocks Preview`/`target` collection (else frames all) first. |
+| `reload_addon`            | Re-import the `blender_blocks` package from the repo tree and re-run `register()`, so file edits apply with no zip rebuild/reinstall. Failed registration returns as a traceback, not a crash. |
+| `clear_preview`           | Remove a `Blender Blocks Preview` collection and the meshes/materials it brought in (only those that drop to 0 users), reverting a preview cleanly. |
 | `reset_scene`             | Load an empty file (File > New, no default cube) for a clean namespace before the append/build tools. Destructive; refuses on unsaved changes unless `force=True`. |
 
 ## The dev loop (editing the add-on)
 
-Once the `snapblock/` package exists, iterate without rebuilding a zip:
+Once the `blender_blocks/` package exists, iterate without rebuilding a zip:
 
-1. Edit a file under `snapblock/` on disk.
+1. Edit a file under `blender_blocks/` on disk.
 2. Call `reload_addon` — it re-imports the package and re-runs `register()` in the
    live session. A syntax/registration error comes back as a traceback string.
 3. Exercise the changed operator via `run_python` (same code path as the button).
@@ -69,7 +69,7 @@ the working tree — no Install-from-Disk step.
 When a check genuinely needs the user's eyes (does the cleaned library look right?),
 don't hand over a screenshot — put it in *their* scene and let them look:
 
-1. Append/lay the objects into a collection named **`SnapBlock Preview`** via
+1. Append/lay the objects into a collection named **`Blender Blocks Preview`** via
    `run_python`, linked only to that collection (not the scene's master collection).
 2. The user inspects directly — orbit, Outliner, click — in their own Blender.
 3. Call `clear_preview` to remove exactly what was added. It only deletes meshes/
@@ -80,7 +80,7 @@ don't hand over a screenshot — put it in *their* scene and let them look:
 
 - **Exercising the add-on:** clicking a panel button just calls an operator, so
   Claude tests features by calling the same operator through `run_python` (e.g.
-  `bpy.ops.snapblock.add_block()`). Same code path as the button. Modal /
+  `bpy.ops.blender_blocks.add_block()`). Same code path as the button. Modal /
   drag-style operators can't be driven from script and need manual testing.
 - **Checking results:** cheap text first (`get_scene_summary`, or a `run_python`
   assertion on names/coords/colors). `get_viewport_screenshot` (optionally
@@ -97,18 +97,18 @@ don't hand over a screenshot — put it in *their* scene and let them look:
    ```
 2. **Register the server with Claude Code** :
    ```powershell
-   claude mcp add snapblock-blender -- .\.venv\Scripts\python.exe .\dev\mcp_server.py
+   claude mcp add blender_blocks-blender -- .\.venv\Scripts\python.exe .\dev\mcp_server.py
    ```
 3. **Install the bridge add-on in Blender:**
    - Edit ▸ Preferences ▸ Add-ons ▸ Install from Disk… ▸ pick `dev\blender_bridge.py`.
-   - Enable "SnapBlock Dev Bridge".
+   - Enable "Blender Blocks Dev Bridge".
 
 ## Each session
 
-1. In Blender: press `N` in the 3D viewport ▸ **SnapBlock Dev** tab ▸
+1. In Blender: press `N` in the 3D viewport ▸ **Blender Blocks Dev** tab ▸
    **Start Bridge Server**. It should read `Listening on 127.0.0.1:9876`.
 2. Start (or restart) Claude Code in this repo so it picks up the
-   `snapblock-blender` MCP server. Its tools are then live.
+   `blender_blocks-blender` MCP server. Its tools are then live.
 
 ## Running it yourself (no Claude)
 
@@ -127,18 +127,18 @@ Python Console) and paste these two lines once per session. Point the first at y
 checkout:
 
 ```python
-SNAPBLOCK_REPO = r"C:\Users\shuan\Documents\personal\Coding\snapblock"
-exec(open(SNAPBLOCK_REPO + r"\dev\console.py").read())
+BLENDER_BLOCKS_REPO = r"C:\Users\shuan\Documents\personal\Coding\snapblock"
+exec(open(BLENDER_BLOCKS_REPO + r"\dev\console.py").read())
 ```
 
 Then call any of:
 
 ```python
-reload()            # reload the snapblock add-on from the working tree
+reload()            # reload the blender_blocks add-on from the working tree
 reset(force=False)  # empty scene (File > New, no cube); refuses if unsaved
 dump(path=None)     # list a .blend's contents (default: the source library)
 scene()             # objects / collections / materials
-clear()             # remove the SnapBlock Preview collection
+clear()             # remove the Blender Blocks Preview collection
 py("...")           # run arbitrary bpy code
 helpme()            # this list
 ```
@@ -155,13 +155,13 @@ py dev\cli.py reset --force   # empty scene
 py dev\cli.py dump            # source library (or pass a PATH)
 py dev\cli.py scene
 py dev\cli.py clear           # optional COLLECTION arg
-py dev\cli.py py "bpy.ops.snapblock.add_block()"
+py dev\cli.py py "bpy.ops.blender_blocks.add_block()"
 py dev\cli.py --help
 ```
 
 ### 3. N-panel buttons
 
-`N` in the 3D viewport ▸ **SnapBlock Dev** tab ▸ the **Dev actions** group:
+`N` in the 3D viewport ▸ **Blender Blocks Dev** tab ▸ the **Dev actions** group:
 Reload / Reset / Dump / Scene / Clear. Dump and Scene print to the system console
 (Window ▸ Toggle System Console). These run in-process too, so they work even with
 the bridge server stopped.

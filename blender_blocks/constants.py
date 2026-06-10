@@ -1,5 +1,5 @@
 """
-SnapBlock constants — the single home for all magic numbers and presets.
+Blender Blocks constants — the single home for all magic numbers and presets.
 
 Nothing else in the add-on should hardcode grid sizes, names, or colors; import
 from here so there's one place to change them.
@@ -20,23 +20,23 @@ H = 1.0   # block body height on Z (one cell). Studs add a little on top.
 GRID_SNAP_TOL = 1e-4
 
 # --- Names / UI ------------------------------------------------------------
-ADDON_CATEGORY = "SnapBlock"            # the N-panel tab name
-BUILD_COLLECTION = "SnapBlock Build"    # collection placed blocks go into
-LIBRARY_FILENAME = "snapblock_library.blend"   # bundled block library
+ADDON_CATEGORY = "Blender Blocks"            # the N-panel tab name
+BUILD_COLLECTION = "Blender Blocks Build"    # collection placed blocks go into
+LIBRARY_FILENAME = "blender_blocks_library.blend"   # bundled block library
 
 # Custom blocks the user captures from a selection live OUTSIDE the package (so an
 # add-on reinstall can't wipe them), one .blend per block, under this subpath of
 # Blender's per-user CONFIG dir (resolved via bpy.utils.user_resource in prefs.py).
-CUSTOM_BLOCKS_DIRNAME = "snapblock/custom_blocks"
+CUSTOM_BLOCKS_DIRNAME = "blender_blocks/custom_blocks"
 
 # --- Follow-a-manual driver ------------------------------------------------
 # Each "bag" in a build plan becomes a collection nested under BUILD_COLLECTION.
 # Data-block names are file-global, so bag names are namespaced with this prefix
 # to avoid colliding with unrelated collections.
-BAG_COLLECTION_PREFIX = "SnapBlock: "
+BAG_COLLECTION_PREFIX = "Blender Blocks: "
 # The ghost hint's throwaway collection + its translucent material. Cleared whenever
 # the hint is toggled off or the step changes — it's a hint, not part of the build.
-GHOST_COLLECTION = "SnapBlock Ghost (hint)"
+GHOST_COLLECTION = "Blender Blocks Ghost (hint)"
 GHOST_MATERIAL = "Ghost"
 GHOST_COLOR = (0.55, 0.6, 0.7)   # cool grey, clearly "not a real block"
 GHOST_OPACITY = 0.25             # translucent so the real build reads through it
@@ -74,14 +74,14 @@ BLOCK_TYPES = (
 )
 
 # --- Materials -------------------------------------------------------------
-# One material per color, named "SnapBlock_<colorname>", Principled BSDF only.
-MATERIAL_PREFIX = "SnapBlock_"
+# One material per color, named "BlenderBlocks_<colorname>", Principled BSDF only.
+MATERIAL_PREFIX = "BlenderBlocks_"
 MATERIAL_ROUGHNESS = 0.4     # plastic-ish — not glossy, not flat
 MATERIAL_SUBSURFACE = 0.1    # a touch of subsurface for a plastic feel
 
 # --- Color presets ---------------------------------------------------------
 # (name, (r, g, b, a)). Applied later as Principled BSDF base color on a
-# material named "SnapBlock_<name>". Values are friendly sRGB-ish picks.
+# material named "BlenderBlocks_<name>". Values are friendly sRGB-ish picks.
 # These are the built-in materials; the user can add their own (see prefs.py).
 COLOR_PRESETS = (
     ("White",  (0.90, 0.90, 0.90, 1.0)),

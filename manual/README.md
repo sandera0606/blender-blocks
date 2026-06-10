@@ -1,4 +1,4 @@
-# SnapBlock manual generator
+# Blender Blocks manual generator
 
 Standalone, pure-Python tool that turns a **build-plan JSON** into a cute nanoblock-style
 PDF booklet you can follow to hand-build a model.
@@ -32,7 +32,7 @@ manual/
 ├── build.py           # one-shot: voxel -> plan -> PDF
 ├── vox_import.py      # MagicaVoxel .vox (+ voxel JSON) -> voxel model  (stdlib only)
 ├── planner.py         # voxel model -> build plan: merge + stud/smooth + order + chunk
-├── catalogue.py       # rectangular block catalogue (synced w/ snapblock/constants.py)
+├── catalogue.py       # rectangular block catalogue (synced w/ blender_blocks/constants.py)
 ├── generate.py        # build plan -> PDF (cover, step grid, finished page)
 ├── buildplan.py       # load/validate a plan, walk it as per-step views (stdlib only)
 ├── iso.py             # isometric drawing: blocks, studs, smooth tops, hover + drop-lines
@@ -102,7 +102,7 @@ step grid with hover + drop-lines + per-step parts list, finished page).
 
 ## Known issues / notes for next time
 
-Cosmetic polish done (`generate.py` / `iso.py`): a warm but restrained SnapBlock identity
+Cosmetic polish done (`generate.py` / `iso.py`): a warm but restrained Blender Blocks identity
 — soft warm-white paper, the lightly-rounded **Mulish** typeface (bundled in `assets/`,
 falls back to Helvetica), one muted clay-rose accent (header band, step badges, badge),
 an editorial tracked "BUILD MANUAL" / "BAG N" treatment, a tinted parts strip, quiet tag

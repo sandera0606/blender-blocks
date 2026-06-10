@@ -1,17 +1,17 @@
 """
-SnapBlock preferences — the add-on's persistent, user-authored store.
+Blender Blocks preferences — the add-on's persistent, user-authored store.
 
 Holds the custom-material library: materials Sandra makes inside Blender, saved in
 the add-on's preferences so they survive across sessions and are available in every
 file (not just the one they were made in).
 
 bpy notes:
-  - This is SnapBlock's first stateful piece. User content lives here in
+  - This is Blender Blocks' first stateful piece. User content lives here in
     AddonPreferences (global to the add-on, per user) rather than on the scene, so a
     material made once shows up everywhere. AddonPreferences is the standard home
     for "settings that belong to the add-on, not to a particular .blend".
   - Glass-box is preserved: an entry here is only a *recipe*. What actually lands on
-    a block is still a normal SnapBlock_<name> material (built in
+    a block is still a normal BlenderBlocks_<name> material (built in
     operators._get_or_create_material), which survives even if the add-on is removed.
 """
 
@@ -26,19 +26,19 @@ from . import constants
 # Shown when a save-a-material action runs but the add-on isn't enabled (so there's
 # nowhere to persist customs). Plain English, points at the fix, no Python jargon.
 PREFS_DISABLED_MSG = (
-    "Custom materials need SnapBlock turned on in Edit ▸ Preferences ▸ Add-ons. "
+    "Custom materials need Blender Blocks turned on in Edit ▸ Preferences ▸ Add-ons. "
     "The built-in colors still work without it."
 )
 
 # Same situation for capturing custom blocks: nowhere to record them if the add-on
 # isn't enabled. The built-in blocks still work without it.
 BLOCKS_DISABLED_MSG = (
-    "Custom blocks need SnapBlock turned on in Edit ▸ Preferences ▸ Add-ons. "
+    "Custom blocks need Blender Blocks turned on in Edit ▸ Preferences ▸ Add-ons. "
     "The built-in blocks still work without it."
 )
 
 
-class SNAPBLOCK_block_item(bpy.types.PropertyGroup):
+class BLENDER_BLOCKS_block_item(bpy.types.PropertyGroup):
     """One custom block the user captured from a selection. Only a *pointer*: the
     geometry lives in its own .blend under the custom-blocks dir (custom_block_path);
     this just records what exists and what to call it.
@@ -52,7 +52,7 @@ class SNAPBLOCK_block_item(bpy.types.PropertyGroup):
     type_id: bpy.props.StringProperty(name="Type ID")
 
 
-class SNAPBLOCK_material_item(bpy.types.PropertyGroup):
+class BLENDER_BLOCKS_material_item(bpy.types.PropertyGroup):
     """One user-made material recipe. The finish preset only seeds these values at
     creation time; what's stored here is the final look."""
     # PropertyGroup gives a "name" StringProperty for free, but declare it so its
@@ -67,44 +67,44 @@ class SNAPBLOCK_material_item(bpy.types.PropertyGroup):
     transmission: bpy.props.FloatProperty(name="Transmission", min=0.0, max=1.0, default=0.0)
 
 
-class SnapBlockPreferences(bpy.types.AddonPreferences):
+class BlenderBlocksPreferences(bpy.types.AddonPreferences):
     # bpy gotcha: bl_idname MUST equal the add-on's package name, or
     # context.preferences.addons[__package__] can't find these preferences. Using
-    # __package__ keeps it correct whether installed as a legacy add-on ("snapblock")
-    # or a 4.2 extension ("bl_ext...snapblock").
+    # __package__ keeps it correct whether installed as a legacy add-on ("blender_blocks")
+    # or a 4.2 extension ("bl_ext...blender_blocks").
     bl_idname = __package__
 
-    custom_materials: bpy.props.CollectionProperty(type=SNAPBLOCK_material_item)
-    custom_blocks: bpy.props.CollectionProperty(type=SNAPBLOCK_block_item)
+    custom_materials: bpy.props.CollectionProperty(type=BLENDER_BLOCKS_material_item)
+    custom_blocks: bpy.props.CollectionProperty(type=BLENDER_BLOCKS_block_item)
 
     def draw(self, context):
         layout = self.layout
 
-        layout.label(text="Your custom materials (add them from the SnapBlock sidebar):")
+        layout.label(text="Your custom materials (add them from the Blender Blocks sidebar):")
         if not self.custom_materials:
             layout.label(text="None yet.", icon='INFO')
         for item in self.custom_materials:
             row = layout.row(align=True)
             row.label(text=item.name, icon='MATERIAL')
             # Set the name on the remove button so it targets this row.
-            op = row.operator("snapblock.remove_material", text="", icon='X')
+            op = row.operator("blender_blocks.remove_material", text="", icon='X')
             op.name = item.name
 
         layout.separator()
 
-        layout.label(text="Your custom blocks (add them from the SnapBlock sidebar):")
+        layout.label(text="Your custom blocks (add them from the Blender Blocks sidebar):")
         if not self.custom_blocks:
             layout.label(text="None yet.", icon='INFO')
         for item in self.custom_blocks:
             row = layout.row(align=True)
             row.label(text=item.name, icon='MESH_CUBE')
             # remove_block targets the row by its type_id (the stable slug).
-            op = row.operator("snapblock.remove_block", text="", icon='X')
+            op = row.operator("blender_blocks.remove_block", text="", icon='X')
             op.type_id = item.type_id
 
 
 def addon_prefs(context):
-    """The SnapBlockPreferences block for this add-on, or None if the add-on isn't
+    """The BlenderBlocksPreferences block for this add-on, or None if the add-on isn't
     enabled through Blender's add-on system.
 
     bpy gotcha: AddonPreferences only become reachable via
@@ -156,7 +156,7 @@ def get_material_spec(context, name):
 
 def material_name_exists(context, name):
     """Case-insensitive check against all preset and custom names — used to stop
-    duplicate names, which would otherwise collide on the shared SnapBlock_<name>
+    duplicate names, which would otherwise collide on the shared BlenderBlocks_<name>
     material (one material per name)."""
     lowered = name.casefold()
     return any(n.casefold() == lowered for n, _ in iter_materials(context))
@@ -214,7 +214,7 @@ def block_name_exists(context, type_id):
 
 
 classes = (
-    SNAPBLOCK_block_item,
-    SNAPBLOCK_material_item,
-    SnapBlockPreferences,
+    BLENDER_BLOCKS_block_item,
+    BLENDER_BLOCKS_material_item,
+    BlenderBlocksPreferences,
 )

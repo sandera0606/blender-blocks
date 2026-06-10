@@ -27,7 +27,7 @@ Back then, I wanted to build a Blender add-on for basic block summoning and mate
   - "Why would I want to build something in MagicaVoxel and then again in Blender? That is so pointless." Well, I like it, so whatever...
 
 ## Download
-1. Download [snablock.zip](snapblock.zip) and [Blender](https://www.blender.org/download/) (have not tested this on anything other than Blender 4.5, but should work on Blender 4.2+)
+1. Download [snablock.zip](blender_blocks.zip) and [Blender](https://www.blender.org/download/) (have not tested this on anything other than Blender 4.5, but should work on Blender 4.2+)
 2. In Blender, go to Edit>Preferences>Add-ons
 3. Click the chevron in the top right coner, and click Install from Disk
 
