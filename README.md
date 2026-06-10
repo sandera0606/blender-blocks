@@ -8,9 +8,9 @@ It was so much fun to turn my brain off for a bit and just place blocks on top o
 
 Here are some things I built (with Nanoblock's manuals !!):
 
-[![psyduck, built with Commotion add on](https://shuang.vercel.app/images/art/lego/psyduck.webp)](https://shuang.vercel.app/images/art/lego/psyduck.mp4)
-![bonsai](https://shuang.vercel.app/images/art/lego/bonsai.webp)
-![totodile](https://shuang.vercel.app/images/art/lego/totodile.webp)
+<a href="https://shuang.vercel.app/images/art/lego/psyduck.mp4"><img src="docs/psyduck-play.webp" alt="psyduck, built with Commotion add on (click to play)" width="300"></a>
+<img src="https://shuang.vercel.app/images/art/lego/bonsai.webp" alt="bonsai" width="300">
+<img src="https://shuang.vercel.app/images/art/lego/totodile.webp" alt="totodile" width="300">
 
 Wow. Just look at that beautiful, crisp Cycles rendering.
 
