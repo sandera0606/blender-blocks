@@ -41,7 +41,7 @@ Now you will find it in your add on menu (right side of the default viewport)!
 ![Hidden add-on menu](docs/tucked-addon.png)
 ![Blender Blocks add on!](docs/blender-blocks.png)
 
-## How to use? The basics
+## How to use? Basics.
 - click on one of the preset blocks in the list of blocks (1x1, 2x1, etc) to summon them onto the screen
 - move blocks around with 
   - g -> move mouse around,
