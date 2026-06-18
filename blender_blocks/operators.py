@@ -486,6 +486,12 @@ class BLENDER_BLOCKS_OT_add_material_from_existing(bpy.types.Operator):
     name: bpy.props.StringProperty(name="Save as", default="")
 
     def invoke(self, context, event):
+        # Blender caches operator props between runs, so without this the dialog
+        # would reopen pre-filled with the previous material's source + name —
+        # and the _on_source_change auto-fill (which only fires when name is
+        # empty) would never re-run. Start each capture from a clean slate.
+        self.source_name = ""
+        self.name = ""
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
