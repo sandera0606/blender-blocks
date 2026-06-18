@@ -61,7 +61,7 @@ Great thanks to Claude Code for helping my dream come to life... here are some c
 - some cool math on my pre-made bricks to normalize all origin points, scales, and rotations
 - built on some code I wrote waay back when I first attempted this project
 - custom MCP server add on just for testing the add on's changes :0 (less work for me.. hooray)
-- help with custom Nanoblock-style manuals on voxel import !!! so cool !!!!
+- help with custom Nanoblock-style manuals on voxel import !!! so cool !!!! (MagicaVoxel -> json build guide -> visual pdf + (coming soon) guided building on Blender)
 
 ## Coming up
 - Ability to follow generated manuals in the add-on!
