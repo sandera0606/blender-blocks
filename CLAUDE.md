@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repository. Read `BLENDER_BLOCKS_BRIEF.md` for the full design — it is the source of truth on scope, architecture, and rationale.
+Guidance for Claude Code when working in this repository.
 
 ## What this is
 
