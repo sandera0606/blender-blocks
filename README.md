@@ -64,4 +64,5 @@ Great thanks to Claude Code for helping my dream come to life... here are some c
 - help with custom Nanoblock-style manuals on voxel import !!! so cool !!!!
 
 ## Coming up
+- Ability to follow generated manuals in the add-on!
 - Maybe I will make my own version of Commotion just for LEGO building so it builds in an order that actually makes sense (sometimes Commotion does not do that)
