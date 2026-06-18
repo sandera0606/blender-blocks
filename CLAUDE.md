@@ -27,19 +27,7 @@ Blender Blocks is a **Blender 4.2+ add-on** — a personal snap-block toy on top
 - **Grid is 1.0 BU.** `U = 1.0`, `H = 1.0`, defined in `blender_blocks/constants.py`. Store placements as integer grid coords `(gx, gy, gz)`; convert to world coords only at placement time. One cell lines up with Blender's default grid and increment-snap (which step by 1.0).
 - **Block loading.** `bpy.data.libraries.load()` to **append** (not link), so each placed block is editable.
 - **Names and grouping.** Placed objects are `Block_<type>.<counter>` (e.g. `Block_2x4.001`) inside a collection called `Blender Blocks Build`. The Outliner is part of the UX.
-- **Materials.** Principled BSDF only. One material per color, named `BlenderBlocks_<colorname>`. No custom shader nodes, no transparency.
-- **One operator per user action.** No mega-operators with branching behavior.
 - **No magic numbers outside `constants.py`.**
-- **User-facing strings.** Plain English, friendly, never condescending, no Python jargon. Errors via `self.report({'ERROR'}, ...)` — never let a traceback reach the user.
-
-## Calibrating explanations
-
-Sandra is **strong at Python, new to bpy** — and wants to keep learning bpy by building this. So:
-
-- Skip explanations of general Python (comprehensions, decorators, context managers, etc.).
-- Explain bpy idioms when introducing them — why this pattern, what the alternatives are. This is the one place a teaching note belongs: it's for her, the builder, not an audience.
-- Flag bpy gotchas inline (one-line comment or sentence). Operators behaving differently in script vs. UI contexts, dependency graph evaluation, data-block ownership, etc.
-- If she calls code ugly, trust her. Bad Python is bad Python; "that's how bpy code looks" is not a defense.
 
 ## Workflow
 
@@ -47,11 +35,3 @@ Sandra is **strong at Python, new to bpy** — and wants to keep learning bpy by
 - Before non-trivial changes to existing code, summarize the planned change first.
 - To verify something about a `.blend` file, inspect it live (`dump_library_state`, `run_python`) rather than guessing; only write a paste-in script if the bridge is down.
 - After editing the add-on, `reload_addon` and exercise the operator via `run_python` — no zip rebuild for dev iteration. Give zip/install steps only when doing a real install.
-
-## Build order
-
-Defer to `BLENDER_BLOCKS_BRIEF.md` → "Build order." Do not maintain a parallel build order here.
-
-## When it's working
-
-There's no benchmark and no audience to satisfy. It's working when building with it feels good — quick to place, snap, move, and color blocks, and the result is a real Blender scene worth keeping. The measure is whether it's fun to build with.
